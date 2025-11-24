@@ -37,20 +37,27 @@ A "Scoreboard" and optimization tool that links **Lead Measures** (Behaviors) to
 - **Historical Data Import:** Input last year's revenue and operational days to calculate the "Baseline Average Check".
 - **KPI Builder:** Select industry (Restaurant, Retail, etc.) and define custom Behaviors.
 
-### 2. The Scoreboard (Central Feature)
+### 2. The Weekly Strategy Session (New)
+- **Weekly Review:** "Last week we did X behaviors. Revenue went up Y%."
+- **AI Behavior Suggestions:** The system recommends new behaviors based on industry and past performance (e.g., "Your alcohol sales are low. Try: 'Upsell Premium Spirits'").
+- **Adoption Check:** "Staff isn't doing Behavior A. Keep it or Drop it?"
+
+### 3. The Scoreboard (Central Feature)
 - **Visuals:** High-contrast leaderboard.
 - **Metrics:**
   - **Lead Measure:** # of times behavior performed (e.g., "Wine Suggestion").
   - **Lag Measure:** Average Check Size, Total Revenue.
   - **Gamification:** "Player of the Week" badges.
 
-### 3. The Intelligence Engine (AI/Analytics)
+### 4. The Intelligence Engine (AI/Analytics)
 - **Correlation Analysis:** "Behavior A is being reported 50 times, but Revenue is flat. Recommendation: Check compliance or change behavior."
-- **Nudges:** Automated prompts to staff/managers based on trends.
+- **Staff AI Coach:** Personal nudges on the staff app. "Hey Joel, try suggesting the 'Special' to your next 3 tables to hit your goal."
 - **Training Hub:** Content suggested based on weak metrics (e.g., "How to upsell without being pushy" video).
 
-### 4. Feedback Loop
+### 5. Feedback Loop & Fraud Prevention
 - **Blocker Reporting:** Anonymous channel for staff to report operational issues hindering sales.
+- **Friction Log:** Staff must enter Table # or Check Amount to verify the behavior.
+- **Manager Audit:** Specific interface to spot-check logged behaviors against printed receipts.
 
 ## 4. Data Architecture (Conceptual)
 
