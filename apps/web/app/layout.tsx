@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AppProvider } from "@/context/AppContext";
+import { AuthProvider } from "@/context/AuthContext";
 import DemoNav from "@/components/DemoNav";
 import CelebrationOverlay from "@/components/CelebrationOverlay";
 
@@ -20,11 +21,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} bg-slate-50 text-slate-900 antialiased min-h-screen`}>
-        <AppProvider>
-          {children}
-          <CelebrationOverlay />
-          <DemoNav />
-        </AppProvider>
+        <AuthProvider>
+          <AppProvider>
+            {children}
+            <CelebrationOverlay />
+            <DemoNav />
+          </AppProvider>
+        </AuthProvider>
       </body>
     </html>
   );
