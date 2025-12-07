@@ -1,5 +1,6 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
-import { hash, compare } from 'bcryptjs'
+import bcrypt from 'bcryptjs'
+const { hash, compare } = bcrypt
 import { prisma } from '@topline/db'
 import { loginSchema, createUserSchema, userSchema } from '@topline/shared'
 import { generateTokens, verifyRefreshToken } from '../middleware/auth.js'

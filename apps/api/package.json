@@ -10,6 +10,7 @@
     "lint": "eslint src"
   },
   "dependencies": {
+    "@hono/node-server": "^1.19.6",
     "@hono/swagger-ui": "^0.4.1",
     "@hono/zod-openapi": "^0.18.3",
     "@topline/db": "*",
