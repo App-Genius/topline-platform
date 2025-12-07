@@ -1,0 +1,357 @@
+# Topline Web Application
+
+## Project Overview
+
+Topline is a **gamified business performance management platform** designed for service businesses (restaurants, retail) to drive revenue growth through behavioral accountability.
+
+### The Core Philosophy
+
+Topline is built on the principle that **revenue (the outcome you want) is driven by specific team behaviors (the inputs you control)**. This is similar to the "4 Disciplines of Execution" (4DX) framework:
+
+- **Lag Measures** = Revenue, Average Check, Customer Ratings (outcomes - you can't directly control these)
+- **Lead Measures** = Behaviors like "Upsell Wine", "Suggest Dessert", "Offer Sparkling Water" (inputs - you CAN control these)
+
+The hypothesis: **If staff consistently execute high-value behaviors, revenue will follow.**
+
+### The Game Mechanic
+
+Topline turns daily performance into a **game against last year's numbers**:
+
+1. **Setup**: Owner enters last year's revenue and days open
+2. **Daily Target**: System calculates the daily revenue needed to "beat last year"
+3. **Win/Lose State**: Each day, the team is either **winning** (above target) or **losing** (below target)
+4. **Scoreboard**: Staff compete on a leaderboard based on behaviors logged and average check
+5. **Celebration**: When records are broken, a celebration overlay triggers
+
+### The User Personas
+
+| Persona | Primary Goal | Key Actions |
+|---------|--------------|-------------|
+| **Owner** | See if we're winning | View analytics, set strategy, monitor health |
+| **Manager** | Ensure accountability | Verify behavior logs, audit shifts, spot fraud |
+| **Staff** | Log behaviors, compete | Log upsells, view personal stats, get AI coaching |
+| **TV Mode** | Public display | Show leaderboard on restaurant TV screens |
+
+### Business Context
+
+The app supports multiple industries:
+- **Restaurant**: Behaviors like wine upsells, dessert suggestions, sparkling water offers
+- **Retail**: Can be adapted for product recommendations, warranty upsells, etc.
+
+### Quality Guardrail
+
+Revenue isn't everything. Topline also tracks **customer ratings** as a "guardrail" to ensure staff aren't being pushy. High behaviors + low ratings = fraud risk alert.
+
+---
+
+## Data Model
+
+### Core Entities
+
+```typescript
+// A team member who logs behaviors
+interface StaffMember {
+  id: string
+  name: string
+  role: 'admin' | 'manager' | 'staff'
+  avatar: string  // Initials like "JD"
+}
+
+// A trackable behavior (lead measure)
+interface Behavior {
+  id: string
+  name: string           // "Upsell Wine"
+  description: string    // "Suggest a bottle instead of glass"
+  type: 'lead'
+  target?: number        // Optional daily target
+}
+
+// A single behavior log entry
+interface BehaviorLog {
+  id: string
+  staffId: string
+  behaviorId: string
+  timestamp: string
+  metadata?: {
+    tableNumber?: string
+    checkAmount?: number
+  }
+  verified: boolean      // Manager has verified this log
+}
+
+// Daily performance entry
+interface DailyEntry {
+  date: string           // "2024-01-15"
+  totalRevenue: number
+  totalCovers: number    // Number of customers/tables
+  staffStats: StaffDailyStat[]
+  reviews?: Review[]     // Customer feedback
+  verified: boolean
+}
+
+// Baseline targets set by owner
+interface BenchmarkData {
+  lastYearRevenue: number
+  daysOpen: number
+  baselineAvgCheck: number   // Calculated: revenue / covers
+  baselineRating: number     // Target customer rating
+}
+```
+
+### Game States
+
+```typescript
+type GameState = 'neutral' | 'winning' | 'losing' | 'celebrating'
+```
+
+- **neutral**: Default state, no strong performance signal
+- **winning**: Today's revenue exceeds daily target (emerald UI)
+- **losing**: Today's revenue below daily target (rose UI)
+- **celebrating**: Record broken, triggers CelebrationOverlay
+
+---
+
+## Application Flow
+
+### 1. Setup (Onboarding)
+Owner enters baseline metrics → System calculates daily target
+
+### 2. Daily Operations
+- **Staff**: Log behaviors throughout shift (two-tap confirmation)
+- **Manager**: Verify logs, input shift revenue/covers at end of day
+- **Scoreboard**: Updates in real-time showing leaderboard
+
+### 3. Analysis
+- **Admin Dashboard**: Owner reviews trends, correlations, AI insights
+- **Strategy**: Weekly planning with AI recommendations
+
+### 4. Demo Scenarios
+The DemoNav allows triggering test scenarios:
+- `high_performance`: Sets winning state, high revenue, good reviews
+- `low_adherence`: Sets losing state, low behaviors, poor results
+- `fraud_alert`: High behaviors but bad reviews (pushy staff)
+- `celebration`: Triggers victory overlay animation
+
+---
+
+## Tech Stack
+
+- **Framework**: Next.js 15 (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS v4
+- **Icons**: Lucide React
+- **Charts**: Recharts
+- **State**: React Context (AppContext)
+- **Utilities**: clsx, tailwind-merge
+
+## Design System
+
+**IMPORTANT**: Before creating any new UI, screens, or components, you MUST read and follow the design system:
+
+📖 **[DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md)**
+
+This document contains:
+- Complete color palette with semantic meanings
+- Typography scale and font usage
+- Spacing and layout guidelines
+- Component patterns with code examples
+- Interactive states and animations
+- Page templates for different contexts
+- Responsive breakpoints
+
+### Key Design Principles
+
+1. **Use semantic colors**: Emerald = success/wins, Rose = danger/losses, Amber = warnings, Blue = actions
+2. **Mobile-first**: Base styles for mobile, use `md:` and `lg:` for larger screens
+3. **Consistent spacing**: Use the defined spacing scale (4, 6, 8 units are most common)
+4. **Dark theme for action pages**: Staff and Scoreboard use dark backgrounds
+5. **Light theme for dashboards**: Admin, Manager, Strategy use light backgrounds
+
+### Quick Component Reference
+
+```tsx
+// Standard card
+<div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+
+// Primary button
+<button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-xl">
+
+// Input field
+<input className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none" />
+
+// Success badge
+<span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-xs font-bold">
+```
+
+## Project Structure
+
+```
+app/
+├── layout.tsx          # Root layout (Inter font, AppProvider)
+├── globals.css         # Global styles, Tailwind imports
+├── page.tsx            # Home/redirect
+├── setup/              # Baseline configuration (onboarding)
+├── admin/              # Owner dashboard with analytics
+├── manager/            # Shift audit and verification
+├── staff/              # Behavior logging (mobile, dark theme)
+├── scoreboard/         # TV display leaderboard (dark theme)
+└── strategy/           # Weekly AI-powered planning
+
+components/
+├── CelebrationOverlay.tsx  # Victory animation overlay
+└── DemoNav.tsx             # Demo navigation controller
+```
+
+## Application Pages
+
+### `/setup` - Baseline Configuration
+**Theme**: Light | **Persona**: Owner (first-time)
+
+The onboarding screen where owners enter:
+- Last year's total revenue
+- Number of days open
+- Baseline customer rating
+
+Calculates the **daily revenue target** that the team needs to beat.
+
+### `/admin` - Business Intelligence Dashboard
+**Theme**: Light | **Persona**: Owner
+
+The owner's analytics hub showing:
+- KPI cards (Revenue MTD, Avg Check, Behaviors, Rating)
+- Revenue vs. Behaviors correlation chart
+- Business health monitor (satisfaction + risk alerts)
+- Recent customer feedback
+- Time range selector (7d/30d/90d)
+
+### `/manager` - Shift Audit & Verification
+**Theme**: Light | **Persona**: Manager
+
+Where managers close out shifts:
+- Input shift revenue and covers
+- View calculated average check
+- Staff selector to filter by team member
+- Behavior audit log with verification checkboxes
+- Ability to mark logs as verified (accountability)
+
+### `/staff` - Behavior Logging
+**Theme**: Dark | **Persona**: Staff (mobile-first)
+
+The frontline worker's interface:
+- Staff avatar selector (demo purposes)
+- Personal stats (behaviors logged, avg check)
+- AI coaching nudge banner
+- Behavior buttons with **two-tap confirmation** pattern
+- Success animation on log completion
+
+### `/scoreboard` - TV Leaderboard
+**Theme**: Dark | **Persona**: TV Mode
+
+Designed for display on restaurant/retail TV screens:
+- Large "Winning/Losing" status indicator
+- Daily revenue vs. target progress
+- Team behaviors count
+- Staff leaderboard with rankings (gold/silver/bronze)
+- Behaviors logged and avg check per staff member
+
+### `/strategy` - Weekly Planning
+**Theme**: Light | **Persona**: Owner
+
+AI-powered strategy session:
+- Performance summary (revenue, behaviors, check)
+- Behavior calibration (approve/reject based on correlation)
+- AI-generated suggestions for new behaviors
+- "Add to Rotation" functionality
+
+## State Management
+
+The app uses React Context (`AppContext`) for global state:
+
+```tsx
+interface AppState {
+  gameState: 'idle' | 'celebrating'
+  currentPersona: 'owner' | 'manager' | 'staff' | 'tv'
+  industryContext: 'restaurant' | 'retail'
+}
+```
+
+## Code Style Guidelines
+
+### TypeScript
+- Use TypeScript for all new files
+- Define interfaces for component props
+- Use `clsx` for conditional class names
+
+### Components
+- Use functional components with hooks
+- Keep components focused and single-purpose
+- Extract reusable patterns to `components/ui/`
+
+### Styling
+- Use Tailwind classes exclusively (no custom CSS unless necessary)
+- Follow the spacing scale from DESIGN_SYSTEM.md
+- Use semantic color names (emerald for success, not green)
+
+## Common Patterns
+
+### Conditional Styling with clsx
+```tsx
+import { clsx } from 'clsx'
+
+<div className={clsx(
+  "base-classes",
+  condition && "conditional-classes",
+  variant === 'primary' ? "primary-classes" : "secondary-classes"
+)}>
+```
+
+### Responsive Grid
+```tsx
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+```
+
+### Page Layout Template
+```tsx
+<div className="min-h-screen bg-slate-50 pb-32">
+  <header className="bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-10 shadow-sm">
+    {/* Header */}
+  </header>
+  <main className="max-w-[1600px] mx-auto p-6 space-y-6">
+    {/* Content */}
+  </main>
+</div>
+```
+
+## Running the Project
+
+```bash
+# Install dependencies
+npm install
+
+# Development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Start production server
+npm start
+```
+
+## Important Notes
+
+1. **Bottom padding**: All pages need `pb-24` or `pb-32` to account for the DemoNav overlay
+2. **Z-index**: DemoNav uses `z-100`, keep overlays below this or explicitly higher
+3. **Dark theme pages**: Staff and Scoreboard have inverted color schemes
+4. **Celebration overlay**: Triggered via `gameState: 'celebrating'` in AppContext
+5. **Font**: Inter is loaded in layout.tsx and applied globally
+
+## When Adding New Features
+
+1. ✅ Read DESIGN_SYSTEM.md first
+2. ✅ Use existing component patterns
+3. ✅ Follow the color semantic system
+4. ✅ Test on mobile viewport (375px)
+5. ✅ Ensure proper contrast for accessibility
+6. ✅ Add bottom padding for DemoNav clearance
+7. ✅ Use Lucide icons (not other icon libraries)

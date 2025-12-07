@@ -1,0 +1,389 @@
+// Topline Database Schema
+// Lead measures drive Lag measures (4DX Framework)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ORGANIZATION & USERS
+// ============================================
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  industry  Industry @default(RESTAURANT)
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users       User[]
+  roles       Role[]
+  behaviors   Behavior[]
+  kpis        Kpi[]
+  locations   Location[]
+  benchmarks  Benchmark[]
+  budgets     Budget[]
+  trainingTopics TrainingTopic[]
+}
+
+enum Industry {
+  RESTAURANT
+  RETAIL
+  HOSPITALITY
+  OTHER
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  passwordHash   String
+  name           String
+  avatar         String?
+  organizationId String
+  roleId         String
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role             Role              @relation(fields: [roleId], references: [id])
+  behaviorLogs     BehaviorLog[]
+  verifiedLogs     BehaviorLog[]     @relation("VerifiedBy")
+  trainingAttendance TrainingAttendance[]
+}
+
+model Role {
+  id             String   @id @default(cuid())
+  name           String
+  type           RoleType
+  permissions    Json     @default("[]")
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  users        User[]
+  behaviors    Behavior[]   @relation("RoleBehaviors")
+
+  @@unique([organizationId, name])
+}
+
+enum RoleType {
+  ADMIN
+  MANAGER
+  SERVER
+  HOST
+  BARTENDER
+  BUSSER
+  PURCHASER
+  CHEF
+  ACCOUNTANT
+  FACILITIES
+  CUSTOM
+}
+
+// ============================================
+// BEHAVIORS (Lead Measures)
+// ============================================
+
+model Behavior {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  targetPerDay   Int      @default(0)
+  points         Int      @default(1)
+  isActive       Boolean  @default(true)
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  roles        Role[]        @relation("RoleBehaviors")
+  logs         BehaviorLog[]
+
+  @@unique([organizationId, name])
+}
+
+model BehaviorLog {
+  id           String   @id @default(cuid())
+  userId       String
+  behaviorId   String
+  locationId   String?
+  metadata     Json     @default("{}")
+  verified     Boolean  @default(false)
+  verifiedById String?
+  verifiedAt   DateTime?
+  createdAt    DateTime @default(now())
+
+  // Relations
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  behavior   Behavior  @relation(fields: [behaviorId], references: [id], onDelete: Cascade)
+  location   Location? @relation(fields: [locationId], references: [id])
+  verifiedBy User?     @relation("VerifiedBy", fields: [verifiedById], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([behaviorId, createdAt])
+  @@index([locationId, createdAt])
+}
+
+// ============================================
+// KPIs (Lag Measures)
+// ============================================
+
+model Kpi {
+  id             String   @id @default(cuid())
+  name           String
+  type           KpiType
+  target         Float?
+  unit           String?  // e.g., "$", "%", "count"
+  isActive       Boolean  @default(true)
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  dailyValues  DailyKpiValue[]
+
+  @@unique([organizationId, type])
+}
+
+enum KpiType {
+  REVENUE
+  AVERAGE_CHECK
+  COVERS
+  RATING
+  BEHAVIOR_COUNT
+  GROSS_OPERATING_PROFIT
+  COST_OF_SALES
+  UTILITIES
+  CASH_FLOW
+  ACCOUNTS_RECEIVABLE
+  BUDGET_VARIANCE
+  FOOD_COST
+  LABOR_COST
+}
+
+model DailyKpiValue {
+  id         String   @id @default(cuid())
+  kpiId      String
+  locationId String
+  date       DateTime @db.Date
+  value      Float
+  createdAt  DateTime @default(now())
+
+  // Relations
+  kpi      Kpi      @relation(fields: [kpiId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([kpiId, locationId, date])
+  @@index([date])
+}
+
+// ============================================
+// LOCATIONS & DAILY ENTRIES
+// ============================================
+
+model Location {
+  id             String   @id @default(cuid())
+  name           String
+  address        String?
+  organizationId String
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization  Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  dailyEntries  DailyEntry[]
+  behaviorLogs  BehaviorLog[]
+  kpiValues     DailyKpiValue[]
+  budgetItems   BudgetLineItem[]
+
+  @@unique([organizationId, name])
+}
+
+model DailyEntry {
+  id           String   @id @default(cuid())
+  locationId   String
+  date         DateTime @db.Date
+  totalRevenue Float    @default(0)
+  totalCovers  Int      @default(0)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  reviews  Review[]
+
+  @@unique([locationId, date])
+  @@index([date])
+}
+
+model Review {
+  id           String   @id @default(cuid())
+  dailyEntryId String
+  source       String   // "google", "tripadvisor", "yelp"
+  rating       Float
+  text         String?
+  createdAt    DateTime @default(now())
+
+  // Relations
+  dailyEntry DailyEntry @relation(fields: [dailyEntryId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// BENCHMARKS
+// ============================================
+
+model Benchmark {
+  id               String   @id @default(cuid())
+  organizationId   String
+  year             Int
+  totalRevenue     Float
+  daysOpen         Int
+  baselineAvgCheck Float
+  baselineRating   Float    @default(4.0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, year])
+}
+
+// ============================================
+// TRAINING
+// ============================================
+
+model TrainingTopic {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  content        String?  // Markdown content
+  videoUrl       String?
+  duration       Int?     // minutes
+  organizationId String
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sessions     TrainingSession[]
+
+  @@unique([organizationId, name])
+}
+
+model TrainingSession {
+  id          String   @id @default(cuid())
+  topicId     String
+  date        DateTime @db.Date
+  completed   Boolean  @default(false)
+  notes       String?
+  photoUrl    String?  // Scanned attendance sheet
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  topic      TrainingTopic        @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  attendance TrainingAttendance[]
+
+  @@index([date])
+}
+
+model TrainingAttendance {
+  id        String   @id @default(cuid())
+  sessionId String
+  userId    String
+  present   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Relations
+  session TrainingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+}
+
+// ============================================
+// BUDGET
+// ============================================
+
+model Budget {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  periodStart    DateTime @db.Date
+  periodEnd      DateTime @db.Date
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lineItems    BudgetLineItem[]
+
+  @@index([periodStart, periodEnd])
+}
+
+model BudgetLineItem {
+  id         String         @id @default(cuid())
+  budgetId   String
+  locationId String?
+  category   BudgetCategory
+  name       String
+  budgeted   Float
+  actual     Float          @default(0)
+  notes      String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  // Relations
+  budget   Budget    @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id])
+}
+
+enum BudgetCategory {
+  REVENUE
+  COGS
+  LABOR
+  UTILITIES
+  RENT
+  MARKETING
+  MAINTENANCE
+  OTHER
+}
+
+// ============================================
+// QUESTIONNAIRE (Pre-qualification)
+// ============================================
+
+model QuestionnaireSubmission {
+  id             String   @id @default(cuid())
+  email          String
+  companyName    String
+  industry       Industry
+  employeeCount  String
+  responses      Json     // Structured answers
+  scores         Json     // Calculated scores per category
+  contacted      Boolean  @default(false)
+  convertedToOrg String?  // Organization ID if converted
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([email])
+  @@index([createdAt])
+}
