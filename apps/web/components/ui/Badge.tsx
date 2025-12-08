@@ -43,10 +43,11 @@ export function Badge({
 }
 
 // Convenience components for common status badges
-export function StatusBadge({ active }: { active: boolean }) {
+export function StatusBadge({ status }: { status: "active" | "inactive" | boolean }) {
+  const isActive = status === "active" || status === true;
   return (
-    <Badge variant={active ? "success" : "default"}>
-      {active ? "Active" : "Inactive"}
+    <Badge variant={isActive ? "success" : "default"}>
+      {isActive ? "Active" : "Inactive"}
     </Badge>
   );
 }

@@ -12,7 +12,7 @@ export interface SelectOption {
 
 export interface SelectProps
   extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "children"> {
-  label: string;
+  label?: string;
   options: SelectOption[];
   error?: string;
   hint?: string;
@@ -24,17 +24,19 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     { label, options, error, hint, placeholder, className, id, ...props },
     ref
   ) => {
-    const inputId = id || `select-${label.toLowerCase().replace(/\s+/g, "-")}`;
+    const inputId = id || (label ? `select-${label.toLowerCase().replace(/\s+/g, "-")}` : undefined);
 
     return (
       <div className={clsx("space-y-1", className)}>
-        <label
-          htmlFor={inputId}
-          className="block text-sm font-medium text-slate-700"
-        >
-          {label}
-          {props.required && <span className="text-red-500 ml-1">*</span>}
-        </label>
+        {label && (
+          <label
+            htmlFor={inputId}
+            className="block text-sm font-medium text-slate-700"
+          >
+            {label}
+            {props.required && <span className="text-red-500 ml-1">*</span>}
+          </label>
+        )}
         <div className="relative">
           <select
             ref={ref}

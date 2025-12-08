@@ -53,10 +53,20 @@ export default function ManagerPage() {
         </div>
       </div>
 
-      {/* New: Weekly Strategy Link */}
-      <div className="bg-slate-900 text-white px-6 py-3 flex justify-between items-center sticky top-[73px] z-10">
+      {/* Daily Briefing Link */}
+      <div className="bg-emerald-600 text-white px-6 py-3 flex justify-between items-center sticky top-[73px] z-10">
         <div className="text-sm font-medium">
-          <span className="text-slate-400">End of Week?</span> Review performance and set next week's behaviors.
+          <span className="text-emerald-200">Start of Shift?</span> Run through today&apos;s briefing with your team.
+        </div>
+        <Link href="/manager/briefing" className="bg-white/20 hover:bg-white/30 px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors">
+          Start Daily Briefing <ArrowRight size={14} />
+        </Link>
+      </div>
+
+      {/* Weekly Strategy Link */}
+      <div className="bg-slate-900 text-white px-6 py-3 flex justify-between items-center sticky top-[146px] z-10">
+        <div className="text-sm font-medium">
+          <span className="text-slate-400">End of Week?</span> Review performance and set next week&apos;s behaviors.
         </div>
         <Link href="/strategy" className="bg-white/10 hover:bg-white/20 px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors">
           Start Strategy Session <ArrowRight size={14} />
