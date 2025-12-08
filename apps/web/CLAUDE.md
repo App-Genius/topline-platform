@@ -348,10 +348,227 @@ npm start
 
 ## When Adding New Features
 
-1. ✅ Read DESIGN_SYSTEM.md first
-2. ✅ Use existing component patterns
-3. ✅ Follow the color semantic system
-4. ✅ Test on mobile viewport (375px)
-5. ✅ Ensure proper contrast for accessibility
-6. ✅ Add bottom padding for DemoNav clearance
-7. ✅ Use Lucide icons (not other icon libraries)
+1. Read DESIGN_SYSTEM.md first
+2. Use existing component patterns
+3. Follow the color semantic system
+4. Test on mobile viewport (375px)
+5. Ensure proper contrast for accessibility
+6. Add bottom padding for DemoNav clearance
+7. Use Lucide icons (not other icon libraries)
+
+---
+
+## MANDATORY ARCHITECTURE RULES
+
+**Read the full architecture guide**: [ARCHITECTURE.md](../../ARCHITECTURE.md)
+
+These rules MUST be followed for all code changes. Violations compromise system reliability.
+
+### Rule 1: Data Fetching - Use Hooks, Never Direct API
+
+**FORBIDDEN - Direct API calls in pages:**
+```tsx
+// BAD - Never do this in a page component
+useEffect(() => {
+  api.users.list().then(setUsers);
+}, []);
+```
+
+**REQUIRED - Use data hooks:**
+```tsx
+// GOOD - Always use hooks
+const { data, isLoading, error, refetch } = useUsers();
+```
+
+**Why**: Hooks handle loading states, error handling, auth checks, and caching consistently.
+
+### Rule 2: No Mock Data in Page Files
+
+**FORBIDDEN - Inline mock data:**
+```tsx
+// BAD - Never define mock data in pages
+const MOCK_INSIGHTS = { ... };
+const MOCK_BUDGET = [ ... ];
+```
+
+**REQUIRED - Mock data locations:**
+- **Demo mode**: `context/DemoContext.tsx`
+- **Tests**: `__tests__/mocks/*.ts`
+- **Storybook**: `*.stories.tsx` files only
+
+**Why**: Mock data in pages creates confusion between demo/production, makes testing harder.
+
+### Rule 3: Component Responsibility Layers
+
+| Layer | Responsibility | Can Import | Cannot Import |
+|-------|---------------|------------|---------------|
+| **Pages** (`app/**/page.tsx`) | Route entry, compose features | Hooks, Feature Components | Direct API, UI Components directly |
+| **Feature Components** (`components/features/`) | Domain logic, user interactions | UI Components, Hooks | Direct API |
+| **UI Components** (`components/ui/`) | Pure presentation | Nothing (props only) | Hooks, API, Features |
+| **Hooks** (`hooks/`) | Data fetching, mutations | API Client | Components |
+
+### Rule 4: Component Props - Clean Interfaces
+
+**FORBIDDEN - God components with everything:**
+```tsx
+// BAD - Page handles everything
+export default function UsersPage() {
+  const [users, setUsers] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  // 300+ lines of UI code...
+}
+```
+
+**REQUIRED - Composed from small components:**
+```tsx
+// GOOD - Page composes feature components
+export default function UsersPage() {
+  const { data, isLoading, error, refetch } = useUsers();
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+  if (isLoading) return <LoadingSpinner />;
+  if (error) return <ErrorAlert message={error.message} />;
+
+  return (
+    <>
+      <UserList users={data} onEdit={setSelectedUser} />
+      <UserFormModal user={selectedUser} onClose={() => setSelectedUser(null)} />
+    </>
+  );
+}
+```
+
+### Rule 5: Error Handling - Consistent Patterns
+
+**FORBIDDEN - Swallowing errors:**
+```tsx
+// BAD
+try { await api.users.create(data); }
+catch (e) { console.log(e); }  // Silent failure
+```
+
+**REQUIRED - Proper error handling:**
+```tsx
+// GOOD - Using hook pattern
+const { mutate, isLoading, error } = useCreateUser();
+
+// In UI
+{error && <ErrorAlert message={error.message} />}
+```
+
+### Rule 6: UI Components - Use the Library
+
+**Before creating ANY UI element, check if it exists:**
+
+| Need | Use Component |
+|------|---------------|
+| Popup/dialog | `<Modal>` from `components/ui` |
+| Data listing | `<DataTable>` from `components/ui` |
+| Yes/No prompt | `<ConfirmDialog>` from `components/ui` |
+| Form input | `<FormField>` from `components/ui` |
+| Dropdown | `<Select>` from `components/ui` |
+| Status indicator | `<Badge>` from `components/ui` |
+| Metric display | `<KpiCard>` from `components/ui` |
+| Loading state | `<LoadingSpinner>` from `components/ui` |
+| Empty list | `<EmptyState>` from `components/ui` |
+| Section switching | `<Tabs>` from `components/ui` |
+
+**If the component doesn't exist**: Create it in `components/ui/` first, then use it.
+
+### Rule 7: Testing Requirements
+
+**All new code MUST have tests:**
+
+| Code Type | Required Tests | Coverage Target |
+|-----------|----------------|-----------------|
+| UI Components | Unit tests with Testing Library | 90% |
+| Hooks | Unit tests with MSW mocking | 90% |
+| Feature Components | Integration tests | 80% |
+| Critical flows | E2E with Playwright | 100% of happy paths |
+
+**Test file locations:**
+- `__tests__/components/ui/*.test.tsx`
+- `__tests__/hooks/*.test.ts`
+- `e2e/flows/*.spec.ts`
+
+### Rule 8: Demo Mode vs Production
+
+**Demo mode is for sales demos ONLY. It must be invisible to production code.**
+
+```tsx
+// Hooks handle the switch internally
+export function useUsers() {
+  const { isDemoMode, mockData } = useDemo();
+
+  if (isDemoMode) {
+    return { data: mockData.users, isLoading: false, error: null };
+  }
+
+  return useApiCall(() => api.users.list());
+}
+
+// Pages don't know about demo mode
+export default function UsersPage() {
+  const { data } = useUsers(); // Works in both modes
+}
+```
+
+---
+
+## Code Review Checklist
+
+Before submitting any code, verify:
+
+- [ ] No direct `api.*` calls in pages (use hooks)
+- [ ] No `MOCK_*` constants in page files
+- [ ] All data comes from hooks
+- [ ] UI components from `components/ui/` used where applicable
+- [ ] Loading and error states handled
+- [ ] Tests written for new code
+- [ ] Component props are typed with interfaces
+- [ ] No business logic in UI components
+
+---
+
+## File Creation Guidelines
+
+When creating new files, follow these patterns:
+
+### New Page
+```
+app/[route]/page.tsx
+- Import hooks for data
+- Import feature components
+- Handle loading/error states
+- Compose UI from components
+- Keep under 50 lines of JSX
+```
+
+### New Feature Component
+```
+components/features/[domain]/[Component].tsx
+- Receive data via props
+- Handle user interactions
+- Emit events via callbacks
+- Import UI components only
+```
+
+### New UI Component
+```
+components/ui/[Component].tsx
+- Pure presentational
+- Fully controlled via props
+- No internal data fetching
+- Add to barrel export in index.ts
+- Write test in __tests__/components/ui/
+```
+
+### New Hook
+```
+hooks/use[Resource].ts
+- Handle API calls
+- Manage loading/error states
+- Check auth status
+- Return consistent shape: { data, isLoading, error, refetch }
+- Write test in __tests__/hooks/
+```
