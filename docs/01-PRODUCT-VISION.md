@@ -669,6 +669,69 @@ Frequency: Monthly
 Alert: Notify if >5% over budget
 ```
 
+### 6.7 Utility Metrics
+
+#### Utility Cost Percentage
+```
+Definition: Total utility expense as percentage of revenue
+Calculation: (Total Utility Cost ÷ Revenue) × 100
+Input: Monthly utility bills (electric, gas, water)
+Frequency: Monthly
+Target: 3-5% of revenue (varies by industry)
+Impacted by: Facilities behaviors (meter readings, HVAC scheduling)
+
+Example:
+- Monthly Revenue: $100,000
+- Electric: $2,500
+- Gas: $800
+- Water: $400
+- Total Utilities: $3,700
+- Utility Cost %: 3.7%
+```
+
+#### Utility Cost Per Cover
+```
+Definition: Utility cost normalized by guest count
+Calculation: Total Utility Cost ÷ Total Covers
+Input: Utility bills + cover counts
+Frequency: Monthly
+Use: Accounts for seasonal volume variation
+Target: Industry-specific (e.g., $0.50-1.00/cover for restaurants)
+
+Example:
+- Monthly Utilities: $3,700
+- Monthly Covers: 4,500
+- Cost per Cover: $0.82
+```
+
+#### Energy Efficiency Index
+```
+Definition: Utility cost compared to baseline (same month last year)
+Calculation: (Current Utility Cost ÷ Baseline Utility Cost) × 100
+Input: Current + historical utility data
+Frequency: Monthly
+Target: <100% (lower = more efficient)
+Note: Adjust for weather variations in extreme climates
+
+Weather Adjustment (optional):
+- Track heating/cooling degree days
+- Normalize comparison across years
+```
+
+#### Key Utility Behaviors That Impact This KPI:
+```
+Facilities Role:
+- Daily meter readings → Early detection of spikes
+- HVAC schedule verification → Prevent after-hours waste
+- Lights-off walkthrough → Reduce unnecessary usage
+- Equipment maintenance → Prevent efficiency losses
+
+All Staff:
+- Turn off lights when leaving area
+- Report equipment issues promptly
+- Follow open/close procedures
+```
+
 ---
 
 ## 7. Role-Specific Behavior Templates
@@ -1498,17 +1561,30 @@ Example Business:
 Revenue Share:
 - 1% of incremental revenue (year over year)
 - Only charged if business revenue increases
-- Capped at $X per year
+- Capped at 2x annual license fees OR $10,000 (whichever is lower)
 
-Example:
+Example 1 (Small Business):
 - Last year revenue: $500,000
 - This year revenue: $600,000
 - Increment: $100,000
-- Performance fee: $1,000
+- Performance fee calculation: $1,000 (1% of $100K)
+- Annual license fees: $4,200 (7 users)
+- Cap: $8,400 (2x license)
+- Actual fee: $1,000 (under cap)
+
+Example 2 (Large Growth):
+- Last year revenue: $1,000,000
+- This year revenue: $1,500,000
+- Increment: $500,000
+- Performance fee calculation: $5,000 (1% of $500K)
+- Annual license fees: $6,000 (10 users)
+- Cap: $10,000 (hard cap applies)
+- Actual fee: $5,000 (under cap)
 
 Rationale:
 - Aligns incentives (we win when you win)
 - If revenue doesn't grow, no performance fee
+- Cap protects businesses with exceptional growth
 - Fair exchange for value delivered
 ```
 
