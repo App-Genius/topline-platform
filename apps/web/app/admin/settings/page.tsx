@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { clsx } from "clsx";
 import {
   Settings,
@@ -11,127 +11,77 @@ import {
   GripVertical,
   Building,
   Bell,
-  Palette,
-  Lock,
   CheckCircle,
-  AlertCircle,
 } from "lucide-react";
-
-interface ScoreboardMetric {
-  id: string;
-  name: string;
-  description: string;
-  enabled: boolean;
-}
-
-interface SettingsState {
-  organization: {
-    name: string;
-    industry: string;
-  };
-  scoreboard: {
-    metrics: ScoreboardMetric[];
-    refreshInterval: number;
-    showLeaderboard: boolean;
-    anonymizeNames: boolean;
-    theme: "dark" | "light";
-  };
-  notifications: {
-    emailAlerts: boolean;
-    budgetWarnings: boolean;
-    performanceUpdates: boolean;
-  };
-}
-
-const DEFAULT_SETTINGS: SettingsState = {
-  organization: {
-    name: "Acme Restaurant Group",
-    industry: "RESTAURANT",
-  },
-  scoreboard: {
-    metrics: [
-      {
-        id: "revenue",
-        name: "Today's Revenue",
-        description: "Shows daily revenue vs target",
-        enabled: true,
-      },
-      {
-        id: "behaviors",
-        name: "Team Behaviors",
-        description: "Total lead measures logged today",
-        enabled: true,
-      },
-      {
-        id: "avgCheck",
-        name: "Average Check",
-        description: "Per-person average check amount",
-        enabled: true,
-      },
-      {
-        id: "topPerformer",
-        name: "Top Performer",
-        description: "Highlights the current leader",
-        enabled: true,
-      },
-      {
-        id: "covers",
-        name: "Total Covers",
-        description: "Number of guests served today",
-        enabled: false,
-      },
-      {
-        id: "rating",
-        name: "Customer Rating",
-        description: "Average rating from reviews",
-        enabled: false,
-      },
-    ],
-    refreshInterval: 30,
-    showLeaderboard: true,
-    anonymizeNames: false,
-    theme: "dark",
-  },
-  notifications: {
-    emailAlerts: true,
-    budgetWarnings: true,
-    performanceUpdates: false,
-  },
-};
+import {
+  useSettings,
+  useUpdateSettings,
+  type SettingsData,
+  type ScoreboardMetric,
+} from "@/hooks/queries";
+import { LoadingSpinner, ErrorAlert, Button } from "@/components/ui";
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<SettingsState>(DEFAULT_SETTINGS);
   const [activeTab, setActiveTab] = useState<
     "organization" | "scoreboard" | "notifications"
   >("scoreboard");
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [localSettings, setLocalSettings] = useState<SettingsData | null>(null);
+
+  // Use React Query hooks
+  const { data: settings, isLoading, error } = useSettings();
+  const updateMutation = useUpdateSettings();
+
+  // Sync local state with fetched settings
+  useEffect(() => {
+    if (settings && !localSettings) {
+      setLocalSettings(settings);
+    }
+  }, [settings, localSettings]);
+
+  const handleSave = () => {
+    if (!localSettings) return;
+    updateMutation.mutate(localSettings);
+  };
 
   const toggleMetric = (metricId: string) => {
-    setSettings((prev) => ({
-      ...prev,
+    if (!localSettings) return;
+    setLocalSettings({
+      ...localSettings,
       scoreboard: {
-        ...prev.scoreboard,
-        metrics: prev.scoreboard.metrics.map((m) =>
+        ...localSettings.scoreboard,
+        metrics: localSettings.scoreboard.metrics.map((m) =>
           m.id === metricId ? { ...m, enabled: !m.enabled } : m
         ),
       },
-    }));
+    });
   };
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsSaving(false);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
-  };
+  // Loading state
+  if (isLoading && !settings) {
+    return (
+      <div className="p-8 flex items-center justify-center min-h-[400px]">
+        <LoadingSpinner label="Loading settings..." />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="p-8">
+        <ErrorAlert message={error.message || "Failed to load settings"} />
+      </div>
+    );
+  }
+
+  // Use local settings or fall back to fetched settings
+  const displaySettings = localSettings || settings;
+  if (!displaySettings) return null;
 
   const tabs = [
-    { id: "organization", label: "Organization", icon: Building },
-    { id: "scoreboard", label: "Scoreboard", icon: Monitor },
-    { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "organization" as const, label: "Organization", icon: Building },
+    { id: "scoreboard" as const, label: "Scoreboard", icon: Monitor },
+    { id: "notifications" as const, label: "Notifications", icon: Bell },
   ];
 
   return (
@@ -147,43 +97,40 @@ export default function SettingsPage() {
             Configure your organization and display preferences
           </p>
         </div>
-        <button
+        <Button
           onClick={handleSave}
-          disabled={isSaving}
+          isLoading={updateMutation.isPending}
+          leftIcon={
+            updateMutation.isSuccess ? (
+              <CheckCircle className="w-5 h-5" />
+            ) : (
+              <Save className="w-5 h-5" />
+            )
+          }
           className={clsx(
-            "flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors",
-            saveSuccess
-              ? "bg-emerald-100 text-emerald-700"
-              : "bg-emerald-600 hover:bg-emerald-500 text-white"
+            updateMutation.isSuccess && "bg-emerald-100 text-emerald-700 hover:bg-emerald-100"
           )}
         >
-          {saveSuccess ? (
-            <>
-              <CheckCircle className="w-5 h-5" />
-              Saved!
-            </>
-          ) : isSaving ? (
-            <>
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Saving...
-            </>
-          ) : (
-            <>
-              <Save className="w-5 h-5" />
-              Save Changes
-            </>
-          )}
-        </button>
+          {updateMutation.isSuccess ? "Saved!" : updateMutation.isPending ? "Saving..." : "Save Changes"}
+        </Button>
       </div>
+
+      {/* Error from save */}
+      {updateMutation.error && (
+        <div className="mb-6">
+          <ErrorAlert message={updateMutation.error.message || "Failed to save settings"} />
+        </div>
+      )}
 
       <div className="flex gap-8">
         {/* Sidebar Tabs */}
-        <div className="w-64 flex-shrink-0">
+        <nav className="w-64 flex-shrink-0" aria-label="Settings navigation">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id)}
+                aria-current={activeTab === tab.id ? "page" : undefined}
                 className={clsx(
                   "w-full px-4 py-3 flex items-center gap-3 text-left transition-colors",
                   activeTab === tab.id
@@ -196,7 +143,7 @@ export default function SettingsPage() {
               </button>
             ))}
           </div>
-        </div>
+        </nav>
 
         {/* Content Area */}
         <div className="flex-1">
@@ -209,17 +156,18 @@ export default function SettingsPage() {
 
               <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label htmlFor="org-name" className="block text-sm font-medium text-slate-700 mb-2">
                     Organization Name
                   </label>
                   <input
+                    id="org-name"
                     type="text"
-                    value={settings.organization.name}
+                    value={displaySettings.organization.name}
                     onChange={(e) =>
-                      setSettings({
-                        ...settings,
+                      setLocalSettings({
+                        ...displaySettings,
                         organization: {
-                          ...settings.organization,
+                          ...displaySettings.organization,
                           name: e.target.value,
                         },
                       })
@@ -229,16 +177,17 @@ export default function SettingsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label htmlFor="org-industry" className="block text-sm font-medium text-slate-700 mb-2">
                     Industry
                   </label>
                   <select
-                    value={settings.organization.industry}
+                    id="org-industry"
+                    value={displaySettings.organization.industry}
                     onChange={(e) =>
-                      setSettings({
-                        ...settings,
+                      setLocalSettings({
+                        ...displaySettings,
                         organization: {
-                          ...settings.organization,
+                          ...displaySettings.organization,
                           industry: e.target.value,
                         },
                       })
@@ -271,15 +220,16 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex items-center gap-2 text-sm text-slate-500">
                     <Eye className="w-4 h-4" />
-                    {settings.scoreboard.metrics.filter((m) => m.enabled).length}{" "}
+                    {displaySettings.scoreboard.metrics.filter((m) => m.enabled).length}{" "}
                     visible
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  {settings.scoreboard.metrics.map((metric) => (
+                <div className="space-y-3" role="list" aria-label="Scoreboard metrics">
+                  {displaySettings.scoreboard.metrics.map((metric: ScoreboardMetric) => (
                     <div
                       key={metric.id}
+                      role="listitem"
                       className={clsx(
                         "p-4 rounded-lg border transition-all",
                         metric.enabled
@@ -289,7 +239,7 @@ export default function SettingsPage() {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <GripVertical className="w-5 h-5 text-slate-400 cursor-grab" />
+                          <GripVertical className="w-5 h-5 text-slate-400 cursor-grab" aria-hidden="true" />
                           <div>
                             <p className="font-medium text-slate-900">
                               {metric.name}
@@ -300,7 +250,10 @@ export default function SettingsPage() {
                           </div>
                         </div>
                         <button
+                          type="button"
                           onClick={() => toggleMetric(metric.id)}
+                          aria-pressed={metric.enabled}
+                          aria-label={`${metric.enabled ? "Hide" : "Show"} ${metric.name}`}
                           className={clsx(
                             "p-2 rounded-lg transition-colors",
                             metric.enabled
@@ -337,18 +290,21 @@ export default function SettingsPage() {
                       </p>
                     </div>
                     <button
+                      type="button"
+                      role="switch"
+                      aria-checked={displaySettings.scoreboard.showLeaderboard}
                       onClick={() =>
-                        setSettings({
-                          ...settings,
+                        setLocalSettings({
+                          ...displaySettings,
                           scoreboard: {
-                            ...settings.scoreboard,
-                            showLeaderboard: !settings.scoreboard.showLeaderboard,
+                            ...displaySettings.scoreboard,
+                            showLeaderboard: !displaySettings.scoreboard.showLeaderboard,
                           },
                         })
                       }
                       className={clsx(
                         "w-12 h-6 rounded-full transition-colors relative",
-                        settings.scoreboard.showLeaderboard
+                        displaySettings.scoreboard.showLeaderboard
                           ? "bg-emerald-500"
                           : "bg-slate-300"
                       )}
@@ -356,7 +312,7 @@ export default function SettingsPage() {
                       <div
                         className={clsx(
                           "w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform shadow",
-                          settings.scoreboard.showLeaderboard
+                          displaySettings.scoreboard.showLeaderboard
                             ? "translate-x-6"
                             : "translate-x-0.5"
                         )}
@@ -374,18 +330,21 @@ export default function SettingsPage() {
                       </p>
                     </div>
                     <button
+                      type="button"
+                      role="switch"
+                      aria-checked={displaySettings.scoreboard.anonymizeNames}
                       onClick={() =>
-                        setSettings({
-                          ...settings,
+                        setLocalSettings({
+                          ...displaySettings,
                           scoreboard: {
-                            ...settings.scoreboard,
-                            anonymizeNames: !settings.scoreboard.anonymizeNames,
+                            ...displaySettings.scoreboard,
+                            anonymizeNames: !displaySettings.scoreboard.anonymizeNames,
                           },
                         })
                       }
                       className={clsx(
                         "w-12 h-6 rounded-full transition-colors relative",
-                        settings.scoreboard.anonymizeNames
+                        displaySettings.scoreboard.anonymizeNames
                           ? "bg-emerald-500"
                           : "bg-slate-300"
                       )}
@@ -393,7 +352,7 @@ export default function SettingsPage() {
                       <div
                         className={clsx(
                           "w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform shadow",
-                          settings.scoreboard.anonymizeNames
+                          displaySettings.scoreboard.anonymizeNames
                             ? "translate-x-6"
                             : "translate-x-0.5"
                         )}
@@ -402,16 +361,17 @@ export default function SettingsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label htmlFor="refresh-interval" className="block text-sm font-medium text-slate-700 mb-2">
                       Refresh Interval
                     </label>
                     <select
-                      value={settings.scoreboard.refreshInterval}
+                      id="refresh-interval"
+                      value={displaySettings.scoreboard.refreshInterval}
                       onChange={(e) =>
-                        setSettings({
-                          ...settings,
+                        setLocalSettings({
+                          ...displaySettings,
                           scoreboard: {
-                            ...settings.scoreboard,
+                            ...displaySettings.scoreboard,
                             refreshInterval: parseInt(e.target.value),
                           },
                         })
@@ -425,21 +385,23 @@ export default function SettingsPage() {
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <fieldset>
+                    <legend className="block text-sm font-medium text-slate-700 mb-2">
                       Theme
-                    </label>
+                    </legend>
                     <div className="flex gap-3">
                       <button
+                        type="button"
                         onClick={() =>
-                          setSettings({
-                            ...settings,
-                            scoreboard: { ...settings.scoreboard, theme: "dark" },
+                          setLocalSettings({
+                            ...displaySettings,
+                            scoreboard: { ...displaySettings.scoreboard, theme: "dark" },
                           })
                         }
+                        aria-pressed={displaySettings.scoreboard.theme === "dark"}
                         className={clsx(
                           "flex-1 p-4 rounded-lg border-2 transition-all",
-                          settings.scoreboard.theme === "dark"
+                          displaySettings.scoreboard.theme === "dark"
                             ? "border-emerald-500 bg-slate-900"
                             : "border-slate-200 bg-slate-900"
                         )}
@@ -450,15 +412,17 @@ export default function SettingsPage() {
                         </div>
                       </button>
                       <button
+                        type="button"
                         onClick={() =>
-                          setSettings({
-                            ...settings,
-                            scoreboard: { ...settings.scoreboard, theme: "light" },
+                          setLocalSettings({
+                            ...displaySettings,
+                            scoreboard: { ...displaySettings.scoreboard, theme: "light" },
                           })
                         }
+                        aria-pressed={displaySettings.scoreboard.theme === "light"}
                         className={clsx(
                           "flex-1 p-4 rounded-lg border-2 transition-all",
-                          settings.scoreboard.theme === "light"
+                          displaySettings.scoreboard.theme === "light"
                             ? "border-emerald-500 bg-white"
                             : "border-slate-200 bg-white"
                         )}
@@ -471,7 +435,7 @@ export default function SettingsPage() {
                         </div>
                       </button>
                     </div>
-                  </div>
+                  </fieldset>
                 </div>
               </div>
 
@@ -491,6 +455,7 @@ export default function SettingsPage() {
                 <a
                   href="/scoreboard"
                   target="_blank"
+                  rel="noopener noreferrer"
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-colors"
                 >
                   Open Preview
@@ -515,18 +480,21 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   <button
+                    type="button"
+                    role="switch"
+                    aria-checked={displaySettings.notifications.emailAlerts}
                     onClick={() =>
-                      setSettings({
-                        ...settings,
+                      setLocalSettings({
+                        ...displaySettings,
                         notifications: {
-                          ...settings.notifications,
-                          emailAlerts: !settings.notifications.emailAlerts,
+                          ...displaySettings.notifications,
+                          emailAlerts: !displaySettings.notifications.emailAlerts,
                         },
                       })
                     }
                     className={clsx(
                       "w-12 h-6 rounded-full transition-colors relative",
-                      settings.notifications.emailAlerts
+                      displaySettings.notifications.emailAlerts
                         ? "bg-emerald-500"
                         : "bg-slate-300"
                     )}
@@ -534,7 +502,7 @@ export default function SettingsPage() {
                     <div
                       className={clsx(
                         "w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform shadow",
-                        settings.notifications.emailAlerts
+                        displaySettings.notifications.emailAlerts
                           ? "translate-x-6"
                           : "translate-x-0.5"
                       )}
@@ -550,18 +518,21 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   <button
+                    type="button"
+                    role="switch"
+                    aria-checked={displaySettings.notifications.budgetWarnings}
                     onClick={() =>
-                      setSettings({
-                        ...settings,
+                      setLocalSettings({
+                        ...displaySettings,
                         notifications: {
-                          ...settings.notifications,
-                          budgetWarnings: !settings.notifications.budgetWarnings,
+                          ...displaySettings.notifications,
+                          budgetWarnings: !displaySettings.notifications.budgetWarnings,
                         },
                       })
                     }
                     className={clsx(
                       "w-12 h-6 rounded-full transition-colors relative",
-                      settings.notifications.budgetWarnings
+                      displaySettings.notifications.budgetWarnings
                         ? "bg-emerald-500"
                         : "bg-slate-300"
                     )}
@@ -569,7 +540,7 @@ export default function SettingsPage() {
                     <div
                       className={clsx(
                         "w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform shadow",
-                        settings.notifications.budgetWarnings
+                        displaySettings.notifications.budgetWarnings
                           ? "translate-x-6"
                           : "translate-x-0.5"
                       )}
@@ -587,19 +558,22 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   <button
+                    type="button"
+                    role="switch"
+                    aria-checked={displaySettings.notifications.performanceUpdates}
                     onClick={() =>
-                      setSettings({
-                        ...settings,
+                      setLocalSettings({
+                        ...displaySettings,
                         notifications: {
-                          ...settings.notifications,
+                          ...displaySettings.notifications,
                           performanceUpdates:
-                            !settings.notifications.performanceUpdates,
+                            !displaySettings.notifications.performanceUpdates,
                         },
                       })
                     }
                     className={clsx(
                       "w-12 h-6 rounded-full transition-colors relative",
-                      settings.notifications.performanceUpdates
+                      displaySettings.notifications.performanceUpdates
                         ? "bg-emerald-500"
                         : "bg-slate-300"
                     )}
@@ -607,7 +581,7 @@ export default function SettingsPage() {
                     <div
                       className={clsx(
                         "w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform shadow",
-                        settings.notifications.performanceUpdates
+                        displaySettings.notifications.performanceUpdates
                           ? "translate-x-6"
                           : "translate-x-0.5"
                       )}

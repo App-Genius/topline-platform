@@ -49,6 +49,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         disabled={disabled || isLoading}
+        aria-disabled={disabled || isLoading}
+        aria-busy={isLoading}
         className={clsx(
           "inline-flex items-center justify-center gap-2 font-medium rounded-lg",
           "transition-colors focus:outline-none focus:ring-2",
@@ -60,11 +62,14 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       >
         {isLoading ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
+          <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
         ) : (
           leftIcon
         )}
-        {children}
+        {isLoading ? (
+          <span className="sr-only">Loading</span>
+        ) : null}
+        <span aria-hidden={isLoading}>{children}</span>
         {!isLoading && rightIcon}
       </button>
     );

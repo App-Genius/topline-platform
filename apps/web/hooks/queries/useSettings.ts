@@ -1,0 +1,216 @@
+"use client";
+
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
+import { queryOptions } from "@/lib/query-client";
+import { useAuth } from "@/context/AuthContext";
+
+// Types
+interface ScoreboardMetric {
+  id: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+}
+
+interface ScoreboardSettings {
+  metrics: ScoreboardMetric[];
+  refreshInterval: number;
+  showLeaderboard: boolean;
+  anonymizeNames: boolean;
+  theme: "dark" | "light";
+}
+
+interface NotificationSettings {
+  emailAlerts: boolean;
+  budgetWarnings: boolean;
+  performanceUpdates: boolean;
+}
+
+interface OrganizationSettings {
+  name: string;
+  industry: string;
+}
+
+interface SettingsData {
+  organization: OrganizationSettings;
+  scoreboard: ScoreboardSettings;
+  notifications: NotificationSettings;
+}
+
+interface UpdateSettingsInput {
+  organization?: Partial<OrganizationSettings>;
+  scoreboard?: Partial<ScoreboardSettings>;
+  notifications?: Partial<NotificationSettings>;
+}
+
+// Default settings
+const DEFAULT_SETTINGS: SettingsData = {
+  organization: {
+    name: "Acme Restaurant Group",
+    industry: "RESTAURANT",
+  },
+  scoreboard: {
+    metrics: [
+      { id: "revenue", name: "Today's Revenue", description: "Shows daily revenue vs target", enabled: true },
+      { id: "behaviors", name: "Team Behaviors", description: "Total lead measures logged today", enabled: true },
+      { id: "avgCheck", name: "Average Check", description: "Per-person average check amount", enabled: true },
+      { id: "topPerformer", name: "Top Performer", description: "Highlights the current leader", enabled: true },
+      { id: "covers", name: "Total Covers", description: "Number of guests served today", enabled: false },
+      { id: "rating", name: "Customer Rating", description: "Average rating from reviews", enabled: false },
+    ],
+    refreshInterval: 30,
+    showLeaderboard: true,
+    anonymizeNames: false,
+    theme: "dark",
+  },
+  notifications: {
+    emailAlerts: true,
+    budgetWarnings: true,
+    performanceUpdates: false,
+  },
+};
+
+/**
+ * Hook for fetching all settings
+ */
+export function useSettings() {
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: queryKeys.settings.current(),
+    queryFn: async (): Promise<SettingsData> => {
+      // Try to get organization settings from API
+      try {
+        const org = await api.organizations.getCurrent();
+        return {
+          ...DEFAULT_SETTINGS,
+          organization: {
+            name: org.name,
+            industry: org.industry || "RESTAURANT",
+          },
+        };
+      } catch {
+        // Return defaults if API fails
+        return DEFAULT_SETTINGS;
+      }
+    },
+    enabled: isAuthenticated,
+    ...queryOptions.static,
+  });
+}
+
+/**
+ * Hook for fetching scoreboard settings
+ */
+export function useScoreboardSettings() {
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: queryKeys.settings.scoreboard(),
+    queryFn: async (): Promise<ScoreboardSettings> => {
+      // TODO: Replace with actual API call when endpoint exists
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return DEFAULT_SETTINGS.scoreboard;
+    },
+    enabled: isAuthenticated,
+    ...queryOptions.static,
+  });
+}
+
+/**
+ * Hook for fetching notification settings
+ */
+export function useNotificationSettings() {
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: queryKeys.settings.notifications(),
+    queryFn: async (): Promise<NotificationSettings> => {
+      // TODO: Replace with actual API call when endpoint exists
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      return DEFAULT_SETTINGS.notifications;
+    },
+    enabled: isAuthenticated,
+    ...queryOptions.static,
+  });
+}
+
+/**
+ * Hook for updating settings
+ *
+ * Features:
+ * - Optimistic updates for instant UI feedback
+ * - Rollback on error
+ * - Proper cache invalidation
+ */
+export function useUpdateSettings() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: UpdateSettingsInput): Promise<SettingsData> => {
+      // Update organization if changed
+      if (data.organization) {
+        await api.organizations.update({
+          name: data.organization.name,
+          settings: data.organization as Record<string, unknown>,
+        });
+      }
+
+      // TODO: Add API calls for scoreboard and notifications when endpoints exist
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Merge with current settings
+      const currentSettings = queryClient.getQueryData<SettingsData>(
+        queryKeys.settings.current()
+      ) || DEFAULT_SETTINGS;
+
+      return {
+        organization: { ...currentSettings.organization, ...data.organization },
+        scoreboard: { ...currentSettings.scoreboard, ...data.scoreboard },
+        notifications: { ...currentSettings.notifications, ...data.notifications },
+      };
+    },
+    onMutate: async (data) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: queryKeys.settings.all });
+
+      // Snapshot previous value
+      const previousSettings = queryClient.getQueryData<SettingsData>(
+        queryKeys.settings.current()
+      );
+
+      // Optimistically update
+      if (previousSettings) {
+        queryClient.setQueryData(queryKeys.settings.current(), {
+          organization: { ...previousSettings.organization, ...data.organization },
+          scoreboard: { ...previousSettings.scoreboard, ...data.scoreboard },
+          notifications: { ...previousSettings.notifications, ...data.notifications },
+        });
+      }
+
+      return { previousSettings };
+    },
+    onError: (_, __, context) => {
+      // Rollback on error
+      if (context?.previousSettings) {
+        queryClient.setQueryData(queryKeys.settings.current(), context.previousSettings);
+      }
+    },
+    onSettled: () => {
+      // Refetch to ensure consistency
+      queryClient.invalidateQueries({ queryKey: queryKeys.settings.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.organization.current() });
+    },
+  });
+}
+
+// Export types for use in components
+export type {
+  SettingsData,
+  ScoreboardSettings,
+  ScoreboardMetric,
+  NotificationSettings,
+  OrganizationSettings,
+};

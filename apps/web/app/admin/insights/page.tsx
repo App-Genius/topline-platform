@@ -9,7 +9,6 @@ import {
   TrendingDown,
   Target,
   DollarSign,
-  Users,
   BookOpen,
   AlertTriangle,
   CheckCircle,
@@ -19,139 +18,26 @@ import {
   ArrowUpRight,
   Clock,
 } from "lucide-react";
-
-// Mock AI-generated insights
-const MOCK_INSIGHTS = {
-  lastUpdated: new Date().toLocaleString(),
-  summary: {
-    overallHealth: 72,
-    opportunities: 4,
-    actions: 3,
-  },
-  trainingRecommendations: [
-    {
-      id: "1",
-      priority: "high",
-      title: "Wine Pairing Training",
-      reason:
-        "Suggestive selling behavior is 23% below target. Staff are missing wine pairing opportunities.",
-      impact: "Could increase average check by $8-12 per table",
-      relatedBehavior: "Suggest Wine Pairing",
-      behaviorCompletion: 42,
-      targetCompletion: 65,
-    },
-    {
-      id: "2",
-      priority: "medium",
-      title: "Dessert Menu Knowledge",
-      reason:
-        "Dessert suggestions dropped 15% this month. Team may need refresher on new menu items.",
-      impact: "Dessert sales typically add $6-10 to check",
-      relatedBehavior: "Offer Dessert Menu",
-      behaviorCompletion: 58,
-      targetCompletion: 75,
-    },
-    {
-      id: "3",
-      priority: "low",
-      title: "VIP Guest Recognition",
-      reason:
-        "VIP recognition is at 89%, but there's room for improvement to hit excellence.",
-      impact: "Improved loyalty and repeat visits",
-      relatedBehavior: "Recognize VIP Guest",
-      behaviorCompletion: 89,
-      targetCompletion: 95,
-    },
-  ],
-  costRecommendations: [
-    {
-      id: "1",
-      category: "Cost of Goods Sold",
-      status: "warning",
-      variance: 5.2,
-      insight:
-        "Food costs are trending 5.2% over budget. Supplier pricing increased this month.",
-      actions: [
-        "Request quotes from 2 alternative seafood suppliers",
-        "Review portion sizes on high-cost items",
-        "Consider menu engineering to push higher-margin items",
-      ],
-      potentialSavings: "$3,200/month",
-    },
-    {
-      id: "2",
-      category: "Labor",
-      status: "warning",
-      variance: 6.1,
-      insight:
-        "Overtime hours exceeded projections by 18%. Weekend dinner shifts most affected.",
-      actions: [
-        "Cross-train servers to cover host duties during peaks",
-        "Adjust scheduling to reduce overtime on Fri/Sat",
-        "Review reservation pacing to smooth demand",
-      ],
-      potentialSavings: "$2,800/month",
-    },
-    {
-      id: "3",
-      category: "Utilities",
-      status: "info",
-      variance: 8.0,
-      insight:
-        "Utility costs up 8%, mostly seasonal. Some savings possible with efficiency.",
-      actions: [
-        "Schedule HVAC maintenance check",
-        "Review equipment usage during non-peak hours",
-      ],
-      potentialSavings: "$400/month",
-    },
-  ],
-  performanceInsights: [
-    {
-      type: "success",
-      title: "Revenue Target Exceeded",
-      description:
-        "Revenue is 3.3% above target this month. Behavior logging is strongly correlated with this success.",
-      metric: "+$14,850",
-    },
-    {
-      type: "info",
-      title: "Behavior Adoption Improving",
-      description:
-        "Overall behavior adoption increased from 62% to 71% over the past 30 days.",
-      metric: "+9%",
-    },
-    {
-      type: "warning",
-      title: "Evening Shift Underperforming",
-      description:
-        "Dinner service average check is 8% below baseline. Consider targeted coaching.",
-      metric: "-$4.20/check",
-    },
-  ],
-  suggestedTrainingTopic: {
-    title: "Suggestive Selling: Wine Pairings",
-    description:
-      "Based on current performance data, focusing on wine pairing suggestions would have the highest impact on your average check.",
-    tips: [
-      "Lead with taste profiles, not price points",
-      "Suggest pairings with every entree order",
-      "Mention limited availability for premium wines",
-    ],
-    expectedImpact: "+$2,400/week in wine sales",
-  },
-};
+import {
+  useInsights,
+  useRefreshInsights,
+  type TrainingRecommendation,
+  type CostRecommendation,
+  type PerformanceInsight,
+} from "@/hooks/queries";
+import { LoadingSpinner, ErrorAlert, Button } from "@/components/ui";
 
 export default function InsightsPage() {
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeSection, setActiveSection] = useState<
     "training" | "costs" | "performance"
   >("training");
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setIsRefreshing(false);
+  // Use React Query hooks for data fetching
+  const { data: insights, isLoading, error } = useInsights();
+  const refreshMutation = useRefreshInsights();
+
+  const handleRefresh = () => {
+    refreshMutation.mutate();
   };
 
   const getPriorityColor = (priority: string) => {
@@ -176,6 +62,34 @@ export default function InsightsPage() {
     }
   };
 
+  // Loading state
+  if (isLoading && !insights) {
+    return (
+      <div className="p-8 flex items-center justify-center min-h-[400px]">
+        <LoadingSpinner label="Loading insights..." />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="p-8">
+        <ErrorAlert message={error.message || "Failed to load insights"} />
+      </div>
+    );
+  }
+
+  // Use data from hook or empty defaults
+  const {
+    lastUpdated = new Date().toLocaleString(),
+    summary = { overallHealth: 0, opportunities: 0, actions: 0 },
+    trainingRecommendations = [],
+    costRecommendations = [],
+    performanceInsights = [],
+    suggestedTrainingTopic = null,
+  } = insights || {};
+
   return (
     <div className="p-8 pb-32">
       {/* Header */}
@@ -192,18 +106,16 @@ export default function InsightsPage() {
         <div className="flex items-center gap-4">
           <div className="text-sm text-slate-500 flex items-center gap-2">
             <Clock className="w-4 h-4" />
-            Updated: {MOCK_INSIGHTS.lastUpdated}
+            Updated: {lastUpdated}
           </div>
-          <button
+          <Button
             onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg transition-colors"
+            isLoading={refreshMutation.isPending}
+            leftIcon={<RefreshCw className="w-5 h-5" />}
+            className="bg-purple-600 hover:bg-purple-500"
           >
-            <RefreshCw
-              className={clsx("w-5 h-5", isRefreshing && "animate-spin")}
-            />
-            {isRefreshing ? "Analyzing..." : "Refresh Insights"}
-          </button>
+            {refreshMutation.isPending ? "Analyzing..." : "Refresh Insights"}
+          </Button>
         </div>
       </div>
 
@@ -213,7 +125,7 @@ export default function InsightsPage() {
           <div className="flex items-center justify-between mb-4">
             <Sparkles className="w-8 h-8 opacity-80" />
             <span className="text-5xl font-bold">
-              {MOCK_INSIGHTS.summary.overallHealth}
+              {summary.overallHealth}
             </span>
           </div>
           <p className="text-purple-100 text-sm font-medium">
@@ -228,7 +140,7 @@ export default function InsightsPage() {
           <div className="flex items-center justify-between mb-4">
             <Lightbulb className="w-8 h-8 text-amber-500" />
             <span className="text-5xl font-bold text-slate-900">
-              {MOCK_INSIGHTS.summary.opportunities}
+              {summary.opportunities}
             </span>
           </div>
           <p className="text-slate-600 text-sm font-medium">
@@ -243,7 +155,7 @@ export default function InsightsPage() {
           <div className="flex items-center justify-between mb-4">
             <Target className="w-8 h-8 text-emerald-500" />
             <span className="text-5xl font-bold text-slate-900">
-              {MOCK_INSIGHTS.summary.actions}
+              {summary.actions}
             </span>
           </div>
           <p className="text-slate-600 text-sm font-medium">
@@ -256,48 +168,50 @@ export default function InsightsPage() {
       </div>
 
       {/* Today's Training Topic Suggestion */}
-      <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-6 mb-8">
-        <div className="flex items-start gap-4">
-          <div className="p-3 bg-emerald-100 rounded-xl">
-            <BookOpen className="w-6 h-6 text-emerald-600" />
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <h3 className="text-lg font-semibold text-emerald-900">
-                Suggested Training Topic for Today
-              </h3>
-              <span className="px-2 py-0.5 bg-emerald-500 text-white text-xs font-bold rounded">
-                AI PICK
-              </span>
+      {suggestedTrainingTopic && (
+        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-6 mb-8">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-emerald-100 rounded-xl">
+              <BookOpen className="w-6 h-6 text-emerald-600" />
             </div>
-            <p className="text-emerald-800 font-medium mb-2">
-              {MOCK_INSIGHTS.suggestedTrainingTopic.title}
-            </p>
-            <p className="text-emerald-700 text-sm mb-4">
-              {MOCK_INSIGHTS.suggestedTrainingTopic.description}
-            </p>
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2 text-sm text-emerald-600">
-                <ArrowUpRight className="w-4 h-4" />
-                Expected Impact:{" "}
-                <span className="font-semibold">
-                  {MOCK_INSIGHTS.suggestedTrainingTopic.expectedImpact}
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <h3 className="text-lg font-semibold text-emerald-900">
+                  Suggested Training Topic for Today
+                </h3>
+                <span className="px-2 py-0.5 bg-emerald-500 text-white text-xs font-bold rounded">
+                  AI PICK
                 </span>
               </div>
-              <a
-                href="/manager/briefing"
-                className="text-sm font-medium text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
-              >
-                Add to Today&apos;s Briefing
-                <ChevronRight className="w-4 h-4" />
-              </a>
+              <p className="text-emerald-800 font-medium mb-2">
+                {suggestedTrainingTopic.title}
+              </p>
+              <p className="text-emerald-700 text-sm mb-4">
+                {suggestedTrainingTopic.description}
+              </p>
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2 text-sm text-emerald-600">
+                  <ArrowUpRight className="w-4 h-4" />
+                  Expected Impact:{" "}
+                  <span className="font-semibold">
+                    {suggestedTrainingTopic.expectedImpact}
+                  </span>
+                </div>
+                <a
+                  href="/manager/briefing"
+                  className="text-sm font-medium text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
+                >
+                  Add to Today&apos;s Briefing
+                  <ChevronRight className="w-4 h-4" />
+                </a>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Tab Navigation */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-6" role="tablist" aria-label="Insight categories">
         {[
           { id: "training", label: "Training Gaps", icon: BookOpen },
           { id: "costs", label: "Cost Optimization", icon: DollarSign },
@@ -305,7 +219,10 @@ export default function InsightsPage() {
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveSection(tab.id as any)}
+            role="tab"
+            aria-selected={activeSection === tab.id}
+            aria-controls={`${tab.id}-panel`}
+            onClick={() => setActiveSection(tab.id as typeof activeSection)}
             className={clsx(
               "px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2",
               activeSection === tab.id
@@ -321,95 +238,114 @@ export default function InsightsPage() {
 
       {/* Training Recommendations */}
       {activeSection === "training" && (
-        <div className="space-y-4">
-          {MOCK_INSIGHTS.trainingRecommendations.map((rec) => (
-            <div
-              key={rec.id}
-              className="bg-white rounded-xl shadow-sm border border-slate-200 p-6"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span
-                      className={clsx(
-                        "px-2 py-1 rounded text-xs font-bold uppercase border",
-                        getPriorityColor(rec.priority)
-                      )}
-                    >
-                      {rec.priority} priority
-                    </span>
-                    <h3 className="text-lg font-semibold text-slate-900">
-                      {rec.title}
-                    </h3>
-                  </div>
-                  <p className="text-slate-600 mb-4">{rec.reason}</p>
+        <div
+          id="training-panel"
+          role="tabpanel"
+          aria-labelledby="training"
+          className="space-y-4"
+        >
+          {trainingRecommendations.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+              <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
+              <p className="text-slate-600">
+                No training gaps identified. Your team is performing well!
+              </p>
+            </div>
+          ) : (
+            trainingRecommendations.map((rec: TrainingRecommendation) => (
+              <div
+                key={rec.id}
+                className="bg-white rounded-xl shadow-sm border border-slate-200 p-6"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span
+                        className={clsx(
+                          "px-2 py-1 rounded text-xs font-bold uppercase border",
+                          getPriorityColor(rec.priority)
+                        )}
+                      >
+                        {rec.priority} priority
+                      </span>
+                      <h3 className="text-lg font-semibold text-slate-900">
+                        {rec.title}
+                      </h3>
+                    </div>
+                    <p className="text-slate-600 mb-4">{rec.reason}</p>
 
-                  <div className="flex items-center gap-6 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Target className="w-4 h-4 text-blue-500" />
-                      <span className="text-slate-500">Related Behavior:</span>
-                      <span className="font-medium text-slate-700">
-                        {rec.relatedBehavior}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-emerald-500" />
-                      <span className="text-slate-500">Potential Impact:</span>
-                      <span className="font-medium text-emerald-600">
-                        {rec.impact}
-                      </span>
+                    <div className="flex items-center gap-6 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Target className="w-4 h-4 text-blue-500" />
+                        <span className="text-slate-500">Related Behavior:</span>
+                        <span className="font-medium text-slate-700">
+                          {rec.relatedBehavior}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-emerald-500" />
+                        <span className="text-slate-500">Potential Impact:</span>
+                        <span className="font-medium text-emerald-600">
+                          {rec.impact}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="ml-6 text-center">
-                  <div className="w-20 h-20 relative">
-                    <svg className="w-20 h-20 transform -rotate-90">
-                      <circle
-                        cx="40"
-                        cy="40"
-                        r="35"
-                        fill="none"
-                        stroke="#e2e8f0"
-                        strokeWidth="6"
-                      />
-                      <circle
-                        cx="40"
-                        cy="40"
-                        r="35"
-                        fill="none"
-                        stroke={
-                          rec.behaviorCompletion >= rec.targetCompletion
-                            ? "#10b981"
-                            : "#f59e0b"
-                        }
-                        strokeWidth="6"
-                        strokeDasharray={`${
-                          (rec.behaviorCompletion / 100) * 220
-                        } 220`}
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-lg font-bold text-slate-900">
-                        {rec.behaviorCompletion}%
-                      </span>
+                  <div className="ml-6 text-center">
+                    <div className="w-20 h-20 relative" role="progressbar" aria-valuenow={rec.behaviorCompletion} aria-valuemin={0} aria-valuemax={100}>
+                      <svg className="w-20 h-20 transform -rotate-90" aria-hidden="true">
+                        <circle
+                          cx="40"
+                          cy="40"
+                          r="35"
+                          fill="none"
+                          stroke="#e2e8f0"
+                          strokeWidth="6"
+                        />
+                        <circle
+                          cx="40"
+                          cy="40"
+                          r="35"
+                          fill="none"
+                          stroke={
+                            rec.behaviorCompletion >= rec.targetCompletion
+                              ? "#10b981"
+                              : "#f59e0b"
+                          }
+                          strokeWidth="6"
+                          strokeDasharray={`${
+                            (rec.behaviorCompletion / 100) * 220
+                          } 220`}
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-lg font-bold text-slate-900">
+                          {rec.behaviorCompletion}%
+                        </span>
+                      </div>
                     </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Target: {rec.targetCompletion}%
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Target: {rec.targetCompletion}%
-                  </p>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       )}
 
       {/* Cost Recommendations */}
       {activeSection === "costs" && (
-        <div className="space-y-4">
-          {MOCK_INSIGHTS.costRecommendations.map((rec) => (
+        <div
+          id="costs-panel"
+          role="tabpanel"
+          aria-labelledby="costs"
+          className="space-y-4"
+        >
+          {costRecommendations.map((rec: CostRecommendation) => (
             <div
               key={rec.id}
               className="bg-white rounded-xl shadow-sm border border-slate-200 p-6"
@@ -475,7 +411,12 @@ export default function InsightsPage() {
               <Sparkles className="w-5 h-5 text-purple-600" />
               <h4 className="font-semibold text-purple-900">Total Potential Savings</h4>
             </div>
-            <p className="text-3xl font-bold text-purple-700">$6,400/month</p>
+            <p className="text-3xl font-bold text-purple-700">
+              ${costRecommendations.reduce((total, rec) => {
+                const match = rec.potentialSavings.match(/\$?([\d,]+)/);
+                return total + (match ? parseInt(match[1].replace(/,/g, "")) : 0);
+              }, 0).toLocaleString()}/month
+            </p>
             <p className="text-sm text-purple-600 mt-1">
               By implementing all cost optimization recommendations
             </p>
@@ -485,8 +426,13 @@ export default function InsightsPage() {
 
       {/* Performance Insights */}
       {activeSection === "performance" && (
-        <div className="space-y-4">
-          {MOCK_INSIGHTS.performanceInsights.map((insight, index) => (
+        <div
+          id="performance-panel"
+          role="tabpanel"
+          aria-labelledby="performance"
+          className="space-y-4"
+        >
+          {performanceInsights.map((insight: PerformanceInsight, index: number) => (
             <div
               key={index}
               className={clsx(

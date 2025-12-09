@@ -572,3 +572,301 @@ hooks/use[Resource].ts
 - Return consistent shape: { data, isLoading, error, refetch }
 - Write test in __tests__/hooks/
 ```
+
+---
+
+## Enterprise Standards
+
+### Data Fetching with React Query
+
+All data fetching MUST use React Query (TanStack Query) via our custom hooks.
+
+**Query Client Configuration** (`lib/query-client.ts`):
+- 5 minute stale time (data considered fresh)
+- 30 minute garbage collection time
+- 3 retries with exponential backoff
+- Offline-first network mode
+
+**Query Key Factory** (`lib/query-keys.ts`):
+```tsx
+// Always use the factory for consistent cache keys
+import { queryKeys } from '@/lib/query-keys';
+
+// Examples:
+queryKeys.users.all           // ['users']
+queryKeys.users.list()        // ['users', 'list']
+queryKeys.users.detail('123') // ['users', 'detail', '123']
+queryKeys.budget.current()    // ['budget', 'current']
+```
+
+**Hook Pattern**:
+```tsx
+// hooks/queries/useUsers.ts
+export function useUsers(params?: UserListParams) {
+  const { isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: queryKeys.users.list(params),
+    queryFn: () => api.users.list(params),
+    enabled: isAuthenticated,
+  });
+}
+
+export function useCreateUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: CreateUserInput) => api.users.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
+    },
+  });
+}
+```
+
+**Available Hooks** (`hooks/queries/index.ts`):
+| Hook | Purpose |
+|------|---------|
+| `useUsers`, `useUser`, `useCreateUser` | User management |
+| `useRoles`, `useRole` | Role definitions |
+| `useBehaviors`, `useLogBehavior` | Behavior tracking |
+| `useBudget`, `useUpdateBudget` | Budget management |
+| `useSettings`, `useUpdateSettings` | App settings |
+| `useInsights`, `useRefreshInsights` | AI insights |
+| `useBriefing`, `useCompleteBriefing` | Daily briefings |
+
+---
+
+### Accessibility Standards (WCAG 2.1 AA)
+
+All UI components MUST meet WCAG 2.1 AA standards.
+
+**Required ARIA Patterns**:
+
+| Component | Requirements |
+|-----------|--------------|
+| Modal | Focus trap, `role="dialog"`, `aria-modal="true"`, `aria-labelledby` |
+| Button (loading) | `aria-busy="true"`, `aria-disabled="true"`, screen reader text |
+| DataTable | `role="grid"`, `aria-sort`, keyboard navigation (arrows, Home, End) |
+| Tabs | `role="tablist"`, `role="tab"`, `aria-selected`, `aria-controls` |
+| Form inputs | `aria-invalid`, `aria-describedby` for errors |
+| Progress bars | `role="progressbar"`, `aria-valuenow`, `aria-valuemin`, `aria-valuemax` |
+| Toggles/Switches | `role="switch"`, `aria-checked` |
+
+**Keyboard Navigation**:
+- All interactive elements must be keyboard accessible
+- Focus indicators must be visible (use `focus:ring-2 focus:ring-blue-500`)
+- Escape closes modals and dropdowns
+- Arrow keys navigate within composite widgets
+
+**Focus Management**:
+- Modal opens → focus moves to modal
+- Modal closes → focus returns to trigger element
+- Use `focus-trap-react` for modal focus containment
+
+**Screen Reader Support**:
+- Use `aria-live="polite"` for dynamic content updates
+- Use `aria-hidden="true"` on decorative icons
+- Provide `sr-only` text for icon-only buttons
+
+**Testing**:
+- Run axe-core in development
+- Test with VoiceOver (Mac) or NVDA (Windows)
+- Verify keyboard-only navigation works
+
+---
+
+### Error Handling Standards
+
+**Error Boundary** (`components/ErrorBoundary.tsx`):
+- Wraps the entire app in `layout.tsx`
+- Catches React errors and displays fallback UI
+- Provides retry functionality
+
+**Query Error Handling**:
+```tsx
+// In pages - show error state
+const { data, isLoading, error } = useUsers();
+
+if (error) {
+  return <ErrorAlert message={error.message} onRetry={refetch} />;
+}
+```
+
+**Mutation Error Handling**:
+```tsx
+const createUser = useCreateUser();
+
+// Option 1: Check error state
+{createUser.error && <ErrorAlert message={createUser.error.message} />}
+
+// Option 2: Handle in onError callback
+const createUser = useCreateUser({
+  onError: (error) => toast.error(error.message),
+});
+```
+
+**Never Swallow Errors**:
+```tsx
+// BAD
+try { await doThing(); } catch (e) { console.log(e); }
+
+// GOOD
+try { await doThing(); } catch (e) {
+  console.error('Failed to do thing:', e);
+  throw e; // Re-throw or handle properly
+}
+```
+
+---
+
+### Form Validation Standards
+
+Use controlled forms with proper validation feedback.
+
+**Pattern**:
+```tsx
+const [formData, setFormData] = useState({ name: '', email: '' });
+const [errors, setErrors] = useState<Record<string, string>>({});
+
+const validate = () => {
+  const newErrors: Record<string, string> = {};
+  if (!formData.name) newErrors.name = 'Name is required';
+  if (!formData.email) newErrors.email = 'Email is required';
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
+
+// In JSX
+<input
+  value={formData.name}
+  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+  aria-invalid={!!errors.name}
+  aria-describedby={errors.name ? 'name-error' : undefined}
+/>
+{errors.name && <span id="name-error" className="text-red-600">{errors.name}</span>}
+```
+
+---
+
+### Performance Standards
+
+**Bundle Size Budgets**:
+- First load JS: < 150KB gzipped
+- Per-route chunks: < 50KB gzipped
+
+**React Query Optimization**:
+- Use `staleTime` to prevent unnecessary refetches
+- Use `enabled` to defer queries until needed
+- Use `select` to transform/filter data
+
+**Component Optimization**:
+- Use `useCallback` for event handlers passed to children
+- Use `useMemo` for expensive computations
+- Avoid inline object/array creation in render
+
+---
+
+### Security Checklist
+
+Before deploying any feature, verify:
+
+- [ ] No secrets in client-side code
+- [ ] API calls use authenticated endpoints
+- [ ] User input is validated before submission
+- [ ] XSS prevention: no `dangerouslySetInnerHTML` without sanitization
+- [ ] CSRF tokens included in mutations (handled by API client)
+- [ ] Sensitive data not logged to console in production
+- [ ] Auth state checked before protected routes
+
+---
+
+## Testing Strategy
+
+### Philosophy: Test Business Logic, Not UI
+
+For this MVP, testing focuses on code that can break user trust:
+- **Calculations** that show wrong numbers
+- **Data mutations** that lose or corrupt data
+- **Permissions** that leak sensitive information
+- **Edge cases** that crash the app
+
+We do NOT extensively test:
+- UI component styling (Button variants, colors)
+- Layout and visual appearance
+- Mock/demo data accuracy
+
+### What We Test
+
+| Priority | Category | Examples | Test Type |
+|----------|----------|----------|-----------|
+| **P0** | Calculations | Budget variance %, average check, margins | Unit |
+| **P0** | Auth flows | Login, token refresh, logout | Unit + E2E |
+| **P1** | Data mutations | Behavior verification, briefing completion | Unit |
+| **P1** | Edge cases | Division by zero, null handling, empty arrays | Unit |
+| **P2** | Critical user flows | Briefing flow, settings updates | E2E |
+| **P2** | Cache invalidation | Data freshness after mutations | Unit |
+
+### High-Risk Files to Test
+
+1. `hooks/queries/useBudget.ts` - Variance calculations
+2. `hooks/queries/useBriefing.ts` - Data assembly, attendance rates
+3. `lib/api-client.ts` - Auth flow, token handling
+4. `hooks/queries/useInsights.ts` - Metrics calculations
+
+### Test Structure
+
+```
+__tests__/
+├── hooks/queries/     # Hook unit tests (business logic)
+├── mocks/             # MSW handlers for API mocking
+├── utils/             # Test utilities (wrapper, helpers)
+└── setup.ts           # Vitest setup with jest-dom
+
+e2e/
+├── fixtures.ts        # Auth mocking, test data
+├── briefing.spec.ts   # Briefing flow E2E
+├── budget.spec.ts     # Budget page E2E
+└── settings.spec.ts   # Settings page E2E
+```
+
+### Running Tests
+
+```bash
+npm run test           # Unit tests (watch mode)
+npm run test:run       # Unit tests (single run)
+npm run test:coverage  # Unit tests with coverage report
+npm run test:e2e       # Playwright E2E tests
+npm run test:e2e:ui    # Playwright with UI
+```
+
+### Writing New Tests
+
+**For hooks (business logic):**
+```tsx
+describe('useBudget', () => {
+  it('calculates variance correctly', async () => {
+    const { result } = renderHook(() => useBudget(), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.summary.variancePercent).toBeCloseTo(-4.7, 1);
+  });
+});
+```
+
+**For E2E (critical flows):**
+```tsx
+test('manager completes daily briefing', async ({ page }) => {
+  await page.goto('/manager/briefing');
+  await page.getByRole('tab', { name: /attendance/i }).click();
+  await page.getByRole('button', { name: /complete/i }).click();
+  await expect(page.getByText(/complete/i)).toBeVisible();
+});
+```
+
+### What NOT to Test
+
+- Component styling (`Button variant="primary"` renders blue)
+- CSS class application
+- Icon rendering
+- Animation timing
+- Mock data values (they're placeholders)

@@ -10,7 +10,6 @@ import {
   PieChart,
   BarChart3,
   Calendar,
-  Plus,
   Edit2,
   ChevronDown,
   ChevronUp,
@@ -28,132 +27,47 @@ import {
   PieChart as RePieChart,
   Pie,
 } from "recharts";
-
-// Mock budget data
-const MOCK_BUDGET = {
-  period: "December 2024",
-  summary: {
-    totalBudget: 285000,
-    totalActual: 298500,
-    variance: -13500,
-    variancePercent: -4.7,
-  },
-  categories: [
-    {
-      id: "revenue",
-      name: "Revenue",
-      type: "income",
-      budget: 450000,
-      actual: 465000,
-      icon: DollarSign,
-      color: "#10b981",
-    },
-    {
-      id: "cogs",
-      name: "Cost of Goods Sold",
-      type: "expense",
-      budget: 135000,
-      actual: 142000,
-      icon: BarChart3,
-      color: "#f59e0b",
-    },
-    {
-      id: "labor",
-      name: "Labor",
-      type: "expense",
-      budget: 90000,
-      actual: 95500,
-      icon: DollarSign,
-      color: "#3b82f6",
-    },
-    {
-      id: "utilities",
-      name: "Utilities",
-      type: "expense",
-      budget: 15000,
-      actual: 16200,
-      icon: DollarSign,
-      color: "#8b5cf6",
-    },
-    {
-      id: "rent",
-      name: "Rent",
-      type: "expense",
-      budget: 25000,
-      actual: 25000,
-      icon: DollarSign,
-      color: "#6366f1",
-    },
-    {
-      id: "marketing",
-      name: "Marketing",
-      type: "expense",
-      budget: 8000,
-      actual: 7800,
-      icon: DollarSign,
-      color: "#ec4899",
-    },
-    {
-      id: "maintenance",
-      name: "Maintenance",
-      type: "expense",
-      budget: 5000,
-      actual: 4500,
-      icon: DollarSign,
-      color: "#14b8a6",
-    },
-    {
-      id: "other",
-      name: "Other Expenses",
-      type: "expense",
-      budget: 7000,
-      actual: 7500,
-      icon: DollarSign,
-      color: "#64748b",
-    },
-  ],
-  alerts: [
-    {
-      type: "warning",
-      category: "Cost of Goods Sold",
-      message: "5.2% over budget. Food costs have increased due to supplier price hikes.",
-      suggestion: "Consider renegotiating with vendors or finding alternatives.",
-    },
-    {
-      type: "warning",
-      category: "Labor",
-      message: "6.1% over budget. Overtime hours exceeded projections.",
-      suggestion: "Review scheduling efficiency and consider cross-training.",
-    },
-    {
-      type: "success",
-      category: "Revenue",
-      message: "3.3% above target! Keep up the momentum.",
-      suggestion: "Analyze which behaviors contributed most to this increase.",
-    },
-  ],
-  monthlyTrend: [
-    { month: "Jul", budget: 280000, actual: 275000 },
-    { month: "Aug", budget: 285000, actual: 290000 },
-    { month: "Sep", budget: 282000, actual: 278000 },
-    { month: "Oct", budget: 290000, actual: 295000 },
-    { month: "Nov", budget: 288000, actual: 292000 },
-    { month: "Dec", budget: 285000, actual: 298500 },
-  ],
-};
+import { useBudget, type BudgetCategory } from "@/hooks/queries";
+import { LoadingSpinner, ErrorAlert, Button } from "@/components/ui";
 
 export default function BudgetPage() {
   const [selectedPeriod, setSelectedPeriod] = useState("December 2024");
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
-  const expenseCategories = MOCK_BUDGET.categories.filter(
-    (c) => c.type === "expense"
-  );
-  const revenueCategory = MOCK_BUDGET.categories.find(
-    (c) => c.type === "income"
-  );
+  // Use React Query hook for data fetching
+  const { data: budgetData, isLoading, error } = useBudget(selectedPeriod);
 
-  const pieData = expenseCategories.map((cat) => ({
+  // Loading state
+  if (isLoading && !budgetData) {
+    return (
+      <div className="p-8 flex items-center justify-center min-h-[400px]">
+        <LoadingSpinner label="Loading budget data..." />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="p-8">
+        <ErrorAlert message={error.message || "Failed to load budget data"} />
+      </div>
+    );
+  }
+
+  // Use data from hook or empty defaults
+  const {
+    period = selectedPeriod,
+    summary = { totalBudget: 0, totalActual: 0, variance: 0, variancePercent: 0 },
+    categories = [],
+    alerts = [],
+    monthlyTrend = [],
+  } = budgetData || {};
+
+  const expenseCategories = categories.filter((c: BudgetCategory) => c.type === "expense");
+  const revenueCategory = categories.find((c: BudgetCategory) => c.type === "income");
+
+  const pieData = expenseCategories.map((cat: BudgetCategory) => ({
     name: cat.name,
     value: cat.actual,
     color: cat.color,
@@ -196,7 +110,9 @@ export default function BudgetPage() {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          <label htmlFor="period-select" className="sr-only">Select period</label>
           <select
+            id="period-select"
             value={selectedPeriod}
             onChange={(e) => setSelectedPeriod(e.target.value)}
             className="px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -206,10 +122,9 @@ export default function BudgetPage() {
             <option>October 2024</option>
             <option>Q4 2024</option>
           </select>
-          <button className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition-colors">
-            <Plus className="w-5 h-5" />
+          <Button leftIcon={<Edit2 className="w-5 h-5" />}>
             Edit Budget
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -238,10 +153,10 @@ export default function BudgetPage() {
             </div>
           </div>
           <p className="text-2xl font-bold text-slate-900">
-            {formatCurrency(MOCK_BUDGET.summary.totalActual)}
+            {formatCurrency(summary.totalActual)}
           </p>
           <p className="text-sm text-red-600 mt-1">
-            +4.7% vs budget
+            +{Math.abs(summary.variancePercent).toFixed(1)}% vs budget
           </p>
         </div>
 
@@ -254,12 +169,12 @@ export default function BudgetPage() {
           </div>
           <p className="text-2xl font-bold text-slate-900">
             {formatCurrency(
-              (revenueCategory?.actual || 0) - MOCK_BUDGET.summary.totalActual
+              (revenueCategory?.actual || 0) - summary.totalActual
             )}
           </p>
           <p className="text-sm text-slate-500 mt-1">
             {(
-              (((revenueCategory?.actual || 0) - MOCK_BUDGET.summary.totalActual) /
+              (((revenueCategory?.actual || 0) - summary.totalActual) /
                 (revenueCategory?.actual || 1)) *
               100
             ).toFixed(1)}
@@ -270,7 +185,7 @@ export default function BudgetPage() {
         <div
           className={clsx(
             "rounded-xl shadow-sm border p-6",
-            MOCK_BUDGET.summary.variance < 0
+            summary.variance < 0
               ? "bg-red-50 border-red-200"
               : "bg-emerald-50 border-emerald-200"
           )}
@@ -279,7 +194,7 @@ export default function BudgetPage() {
             <p
               className={clsx(
                 "text-sm",
-                MOCK_BUDGET.summary.variance < 0
+                summary.variance < 0
                   ? "text-red-600"
                   : "text-emerald-600"
               )}
@@ -289,12 +204,12 @@ export default function BudgetPage() {
             <div
               className={clsx(
                 "p-2 rounded-lg",
-                MOCK_BUDGET.summary.variance < 0
+                summary.variance < 0
                   ? "bg-red-100"
                   : "bg-emerald-100"
               )}
             >
-              {MOCK_BUDGET.summary.variance < 0 ? (
+              {summary.variance < 0 ? (
                 <TrendingDown className="w-5 h-5 text-red-600" />
               ) : (
                 <TrendingUp className="w-5 h-5 text-emerald-600" />
@@ -304,18 +219,18 @@ export default function BudgetPage() {
           <p
             className={clsx(
               "text-2xl font-bold",
-              MOCK_BUDGET.summary.variance < 0 ? "text-red-700" : "text-emerald-700"
+              summary.variance < 0 ? "text-red-700" : "text-emerald-700"
             )}
           >
-            {formatCurrency(Math.abs(MOCK_BUDGET.summary.variance))}
+            {formatCurrency(Math.abs(summary.variance))}
           </p>
           <p
             className={clsx(
               "text-sm mt-1",
-              MOCK_BUDGET.summary.variance < 0 ? "text-red-600" : "text-emerald-600"
+              summary.variance < 0 ? "text-red-600" : "text-emerald-600"
             )}
           >
-            {MOCK_BUDGET.summary.variance < 0 ? "Over" : "Under"} budget
+            {summary.variance < 0 ? "Over" : "Under"} budget
           </p>
         </div>
       </div>
@@ -328,9 +243,9 @@ export default function BudgetPage() {
             <h2 className="text-lg font-semibold text-slate-900 mb-6">
               Budget vs Actual Trend
             </h2>
-            <div className="h-[300px]">
+            <div className="h-[300px]" role="img" aria-label="Budget vs Actual trend chart">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={MOCK_BUDGET.monthlyTrend} barGap={4}>
+                <BarChart data={monthlyTrend} barGap={4}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                   <YAxis
@@ -351,7 +266,7 @@ export default function BudgetPage() {
                     name="Actual"
                     radius={[4, 4, 0, 0]}
                   >
-                    {MOCK_BUDGET.monthlyTrend.map((entry, index) => (
+                    {monthlyTrend.map((entry, index) => (
                       <Cell
                         key={index}
                         fill={
@@ -377,7 +292,7 @@ export default function BudgetPage() {
             </div>
 
             <div className="divide-y divide-slate-100">
-              {MOCK_BUDGET.categories.map((category) => {
+              {categories.map((category: BudgetCategory) => {
                 const variance = category.actual - category.budget;
                 const variancePercent = (variance / category.budget) * 100;
                 const isExpense = category.type === "expense";
@@ -389,7 +304,9 @@ export default function BudgetPage() {
                       onClick={() =>
                         setExpandedCategory(isExpanded ? null : category.id)
                       }
-                      className="w-full px-6 py-4 hover:bg-slate-50 transition-colors"
+                      className="w-full px-6 py-4 hover:bg-slate-50 transition-colors text-left"
+                      aria-expanded={isExpanded}
+                      aria-controls={`category-${category.id}-details`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
@@ -402,7 +319,7 @@ export default function BudgetPage() {
                               style={{ backgroundColor: category.color }}
                             />
                           </div>
-                          <div className="text-left">
+                          <div>
                             <p className="font-medium text-slate-900">
                               {category.name}
                             </p>
@@ -455,7 +372,7 @@ export default function BudgetPage() {
 
                       {/* Progress Bar */}
                       <div className="mt-3">
-                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden" role="progressbar" aria-valuenow={category.actual} aria-valuemax={category.budget}>
                           <div
                             className="h-full rounded-full transition-all"
                             style={{
@@ -474,7 +391,10 @@ export default function BudgetPage() {
                     </button>
 
                     {isExpanded && (
-                      <div className="px-6 py-4 bg-slate-50 border-t border-slate-100">
+                      <div
+                        id={`category-${category.id}-details`}
+                        className="px-6 py-4 bg-slate-50 border-t border-slate-100"
+                      >
                         <div className="grid grid-cols-3 gap-4 text-sm">
                           <div>
                             <p className="text-slate-500">Daily Average</p>
@@ -488,7 +408,7 @@ export default function BudgetPage() {
                               {(
                                 (category.actual /
                                   (category.type === "expense"
-                                    ? MOCK_BUDGET.summary.totalActual
+                                    ? summary.totalActual
                                     : category.actual)) *
                                 100
                               ).toFixed(1)}
@@ -525,7 +445,7 @@ export default function BudgetPage() {
             <h2 className="text-lg font-semibold text-slate-900 mb-4">
               Expense Distribution
             </h2>
-            <div className="h-[200px]">
+            <div className="h-[200px]" role="img" aria-label="Expense distribution pie chart">
               <ResponsiveContainer width="100%" height="100%">
                 <RePieChart>
                   <Pie
@@ -558,6 +478,7 @@ export default function BudgetPage() {
                   <div
                     className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: item.color }}
+                    aria-hidden="true"
                   />
                   <span className="text-slate-600 truncate">{item.name}</span>
                 </div>
@@ -573,9 +494,9 @@ export default function BudgetPage() {
               </h2>
             </div>
 
-            <div className="divide-y divide-slate-100">
-              {MOCK_BUDGET.alerts.map((alert, index) => (
-                <div key={index} className="p-4">
+            <div className="divide-y divide-slate-100" role="list" aria-label="Budget alerts">
+              {alerts.map((alert, index) => (
+                <div key={index} className="p-4" role="listitem">
                   <div className="flex items-start gap-3">
                     <div
                       className={clsx(
@@ -586,9 +507,9 @@ export default function BudgetPage() {
                       )}
                     >
                       {alert.type === "warning" ? (
-                        <AlertTriangle className="w-4 h-4 text-amber-600" />
+                        <AlertTriangle className="w-4 h-4 text-amber-600" aria-hidden="true" />
                       ) : (
-                        <CheckCircle className="w-4 h-4 text-emerald-600" />
+                        <CheckCircle className="w-4 h-4 text-emerald-600" aria-hidden="true" />
                       )}
                     </div>
                     <div>
@@ -614,18 +535,27 @@ export default function BudgetPage() {
               Quick Actions
             </h3>
             <div className="space-y-2">
-              <button className="w-full px-4 py-2 text-left text-sm bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-slate-400" />
+              <Button
+                variant="secondary"
+                className="w-full justify-start"
+                leftIcon={<Calendar className="w-4 h-4" />}
+              >
                 View Previous Periods
-              </button>
-              <button className="w-full px-4 py-2 text-left text-sm bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors flex items-center gap-2">
-                <Edit2 className="w-4 h-4 text-slate-400" />
+              </Button>
+              <Button
+                variant="secondary"
+                className="w-full justify-start"
+                leftIcon={<Edit2 className="w-4 h-4" />}
+              >
                 Adjust Budget Targets
-              </button>
-              <button className="w-full px-4 py-2 text-left text-sm bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-slate-400" />
+              </Button>
+              <Button
+                variant="secondary"
+                className="w-full justify-start"
+                leftIcon={<BarChart3 className="w-4 h-4" />}
+              >
                 Export Report
-              </button>
+              </Button>
             </div>
           </div>
         </div>
