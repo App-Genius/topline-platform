@@ -17,6 +17,9 @@ This document defines the comprehensive testing strategy for Topline, including 
 7. [Testing Infrastructure](#7-testing-infrastructure)
 8. [Coverage Requirements](#8-coverage-requirements)
 9. [CI/CD Integration](#9-cicd-integration)
+10. [Agentic Testing with Chrome MCP](#10-agentic-testing-with-chrome-mcp)
+11. [LLM-as-Judge Error Analysis](#11-llm-as-judge-error-analysis)
+12. [AI Operations Testing](#12-ai-operations-testing)
 
 ---
 
@@ -1243,6 +1246,883 @@ jobs:
         with:
           name: playwright-report
           path: playwright-report/
+```
+
+---
+
+## 10. Agentic Testing with Chrome MCP
+
+### 10.1 Philosophy
+
+Beyond traditional E2E testing, we employ **agentic testing** - using AI agents to simulate real user journeys through the system. This approach:
+
+- Discovers edge cases humans might miss
+- Tests user flows as actual personas would experience them
+- Generates comprehensive logs for error analysis
+- Can run continuously to stress-test the system
+
+### 10.2 Chrome MCP Integration
+
+We use the Chrome DevTools MCP server to enable AI agents to interact with the browser:
+
+```typescript
+// tests/agentic/setup.ts
+import { createMCPClient } from '@anthropic/mcp-client';
+
+export async function createBrowserAgent() {
+  const client = await createMCPClient({
+    transport: 'stdio',
+    command: 'npx',
+    args: ['@anthropic/mcp-server-chrome-devtools']
+  });
+
+  return {
+    // Navigate to a URL
+    navigate: async (url: string) => {
+      await client.call('navigate_page', { url, type: 'url' });
+    },
+
+    // Take a snapshot for understanding page state
+    snapshot: async () => {
+      return await client.call('take_snapshot', {});
+    },
+
+    // Click on an element by its accessibility ID
+    click: async (uid: string) => {
+      await client.call('click', { uid });
+    },
+
+    // Fill in a form field
+    fill: async (uid: string, value: string) => {
+      await client.call('fill', { uid, value });
+    },
+
+    // Wait for text to appear
+    waitFor: async (text: string, timeout = 10000) => {
+      await client.call('wait_for', { text, timeout });
+    },
+
+    // Take screenshot for visual verification
+    screenshot: async (path?: string) => {
+      return await client.call('take_screenshot', { filePath: path });
+    }
+  };
+}
+```
+
+### 10.3 Persona-Based Test Scenarios
+
+Each test scenario simulates a specific user persona:
+
+```typescript
+// tests/agentic/scenarios/staff-persona.ts
+import { createBrowserAgent } from '../setup';
+import { logTestAction, logTestError } from '../logging';
+
+interface StaffPersona {
+  name: string;
+  role: 'server' | 'bartender' | 'host';
+  experience: 'new' | 'experienced';
+  techComfort: 'low' | 'medium' | 'high';
+  behaviorPatterns: string[];
+}
+
+const STAFF_PERSONAS: StaffPersona[] = [
+  {
+    name: 'Maria - New Server',
+    role: 'server',
+    experience: 'new',
+    techComfort: 'low',
+    behaviorPatterns: [
+      'logs_slowly',
+      'forgets_optional_fields',
+      'needs_confirmation'
+    ]
+  },
+  {
+    name: 'Joel - Experienced Server',
+    role: 'server',
+    experience: 'experienced',
+    techComfort: 'high',
+    behaviorPatterns: [
+      'logs_quickly',
+      'uses_shortcuts',
+      'bulk_logs_at_end'
+    ]
+  },
+  {
+    name: 'Sam - Tech-Challenged',
+    role: 'server',
+    experience: 'experienced',
+    techComfort: 'low',
+    behaviorPatterns: [
+      'multiple_tap_attempts',
+      'confusion_with_modals',
+      'accidental_back_navigation'
+    ]
+  }
+];
+
+export async function runStaffPersonaTest(persona: StaffPersona) {
+  const agent = await createBrowserAgent();
+  const actions: TestAction[] = [];
+
+  try {
+    // Login
+    await agent.navigate('http://localhost:3000/staff-login');
+    await logTestAction(actions, 'navigate', 'staff-login');
+
+    const snapshot = await agent.snapshot();
+    const pinInput = findElementByRole(snapshot, 'textbox', 'PIN');
+
+    if (persona.techComfort === 'low') {
+      // Simulate hesitation - wait before typing
+      await delay(2000);
+    }
+
+    await agent.fill(pinInput.uid, '1234');
+    await logTestAction(actions, 'fill', 'pin-input');
+
+    const loginButton = findElementByRole(snapshot, 'button', 'Sign In');
+    await agent.click(loginButton.uid);
+    await logTestAction(actions, 'click', 'login-button');
+
+    // Wait for dashboard
+    await agent.waitFor('My Actions');
+    await logTestAction(actions, 'waitFor', 'dashboard-loaded');
+
+    // Log behaviors based on persona patterns
+    if (persona.behaviorPatterns.includes('bulk_logs_at_end')) {
+      // Experienced staff: navigate around first, then bulk log
+      await simulateBrowsing(agent, actions);
+      await bulkLogBehaviors(agent, actions, 5);
+    } else {
+      // New staff: log one at a time
+      for (let i = 0; i < 3; i++) {
+        await logSingleBehavior(agent, actions, persona);
+        if (persona.techComfort === 'low') {
+          await delay(1500); // Hesitation between logs
+        }
+      }
+    }
+
+    return { success: true, actions };
+
+  } catch (error) {
+    await logTestError(actions, error);
+    await agent.screenshot(`tests/artifacts/${persona.name}-error.png`);
+    return { success: false, actions, error };
+  }
+}
+```
+
+### 10.4 Comprehensive Logging
+
+All agentic test actions are logged for analysis:
+
+```typescript
+// tests/agentic/logging.ts
+interface TestAction {
+  timestamp: Date;
+  type: 'navigate' | 'click' | 'fill' | 'waitFor' | 'screenshot' | 'error';
+  target: string;
+  duration?: number;
+  screenshot?: string;
+  snapshot?: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface TestSession {
+  id: string;
+  startTime: Date;
+  endTime?: Date;
+  persona: string;
+  scenario: string;
+  actions: TestAction[];
+  result: 'pass' | 'fail' | 'error';
+  errors?: Array<{
+    message: string;
+    stack?: string;
+    screenshot?: string;
+  }>;
+}
+
+let currentSession: TestSession | null = null;
+
+export async function startTestSession(persona: string, scenario: string) {
+  currentSession = {
+    id: crypto.randomUUID(),
+    startTime: new Date(),
+    persona,
+    scenario,
+    actions: [],
+    result: 'pass'
+  };
+}
+
+export async function logTestAction(
+  actions: TestAction[],
+  type: TestAction['type'],
+  target: string,
+  metadata?: Record<string, unknown>
+) {
+  const action: TestAction = {
+    timestamp: new Date(),
+    type,
+    target,
+    metadata
+  };
+
+  actions.push(action);
+  currentSession?.actions.push(action);
+
+  // Also log to analytics for aggregation
+  await analytics.track('agentic_test_action', {
+    sessionId: currentSession?.id,
+    type,
+    target,
+    persona: currentSession?.persona,
+    scenario: currentSession?.scenario
+  });
+}
+
+export async function logTestError(actions: TestAction[], error: Error) {
+  if (currentSession) {
+    currentSession.result = 'error';
+    currentSession.errors = currentSession.errors || [];
+    currentSession.errors.push({
+      message: error.message,
+      stack: error.stack
+    });
+  }
+}
+
+export async function endTestSession(): Promise<TestSession> {
+  if (!currentSession) throw new Error('No active session');
+
+  currentSession.endTime = new Date();
+
+  // Store session for later analysis
+  await storeTestSession(currentSession);
+
+  const session = currentSession;
+  currentSession = null;
+  return session;
+}
+```
+
+### 10.5 User Journey Simulation
+
+Complete user journeys are simulated based on actual user flows:
+
+```typescript
+// tests/agentic/journeys/manager-day.ts
+export async function simulateManagerDay() {
+  const agent = await createBrowserAgent();
+
+  const journey = {
+    name: 'Manager Full Day Journey',
+    steps: [
+      // Morning: Daily Briefing
+      { time: '10:00', action: 'complete_briefing' },
+
+      // Throughout Day: Verify behaviors
+      { time: '12:00', action: 'verify_behaviors', count: 5 },
+      { time: '15:00', action: 'verify_behaviors', count: 8 },
+      { time: '18:00', action: 'verify_behaviors', count: 10 },
+
+      // End of Day: Daily Entry
+      { time: '22:00', action: 'submit_daily_entry' },
+
+      // Review: Check dashboard
+      { time: '22:15', action: 'review_dashboard' },
+    ]
+  };
+
+  for (const step of journey.steps) {
+    console.log(`Simulating ${step.action} at ${step.time}`);
+
+    switch (step.action) {
+      case 'complete_briefing':
+        await completeBriefingFlow(agent);
+        break;
+      case 'verify_behaviors':
+        await verifyBehaviorsFlow(agent, step.count);
+        break;
+      case 'submit_daily_entry':
+        await submitDailyEntryFlow(agent);
+        break;
+      case 'review_dashboard':
+        await reviewDashboardFlow(agent);
+        break;
+    }
+
+    // Take screenshot after each major step
+    await agent.screenshot(
+      `tests/artifacts/manager-day/${step.time.replace(':', '')}-${step.action}.png`
+    );
+  }
+}
+```
+
+---
+
+## 11. LLM-as-Judge Error Analysis
+
+### 11.1 Overview
+
+When tests fail or produce unexpected results, we use LLM analysis to:
+- Understand what went wrong
+- Categorize error types
+- Suggest fixes
+- Identify patterns across failures
+
+### 11.2 Error Analysis Pipeline
+
+```typescript
+// tests/analysis/error-analyzer.ts
+import { generateWithFallback } from '@/lib/ai/factory';
+import { z } from 'zod';
+
+const ErrorAnalysisSchema = z.object({
+  category: z.enum([
+    'ui_interaction_failure',
+    'timing_issue',
+    'data_validation_error',
+    'network_error',
+    'auth_failure',
+    'business_logic_error',
+    'environmental_issue',
+    'unknown'
+  ]),
+  rootCause: z.string().max(500),
+  confidence: z.number().min(0).max(1),
+  suggestedFix: z.string().max(300),
+  isFlaky: z.boolean(),
+  requiresHumanReview: z.boolean(),
+  relatedTests: z.array(z.string()).optional(),
+  potentialImpact: z.enum(['low', 'medium', 'high', 'critical'])
+});
+
+type ErrorAnalysis = z.infer<typeof ErrorAnalysisSchema>;
+
+export async function analyzeTestFailure(
+  testSession: TestSession
+): Promise<ErrorAnalysis> {
+  const prompt = `
+Analyze this test failure and provide structured analysis.
+
+TEST SESSION:
+- Persona: ${testSession.persona}
+- Scenario: ${testSession.scenario}
+- Duration: ${testSession.endTime.getTime() - testSession.startTime.getTime()}ms
+
+ACTIONS TAKEN:
+${testSession.actions.map(a => `[${a.timestamp.toISOString()}] ${a.type}: ${a.target}`).join('\n')}
+
+ERRORS:
+${testSession.errors?.map(e => `${e.message}\n${e.stack}`).join('\n\n')}
+
+Analyze:
+1. What category of error is this?
+2. What is the root cause?
+3. How confident are you in this analysis?
+4. What fix would you suggest?
+5. Is this likely a flaky test (timing, environment)?
+6. Does this require human review?
+7. What is the potential impact if this issue reached production?
+
+Respond with JSON matching the ErrorAnalysis schema.
+`;
+
+  return generateWithFallback({
+    prompt,
+    systemPrompt: 'You are an expert test failure analyst.',
+    schema: ErrorAnalysisSchema
+  });
+}
+```
+
+### 11.3 Pattern Detection
+
+```typescript
+// tests/analysis/pattern-detector.ts
+interface FailurePattern {
+  pattern: string;
+  occurrences: number;
+  affectedTests: string[];
+  commonCharacteristics: string[];
+  suggestedSystemicFix: string;
+}
+
+export async function detectFailurePatterns(
+  failures: TestSession[]
+): Promise<FailurePattern[]> {
+  // Group failures by analysis category
+  const analyses = await Promise.all(
+    failures.map(f => analyzeTestFailure(f))
+  );
+
+  const byCategory = groupBy(analyses, a => a.category);
+
+  const patterns: FailurePattern[] = [];
+
+  for (const [category, categoryFailures] of Object.entries(byCategory)) {
+    if (categoryFailures.length >= 3) {
+      // Potential pattern detected
+      const pattern = await identifyPattern(category, categoryFailures);
+      patterns.push(pattern);
+    }
+  }
+
+  return patterns;
+}
+
+async function identifyPattern(
+  category: string,
+  failures: ErrorAnalysis[]
+): Promise<FailurePattern> {
+  const prompt = `
+Analyze these ${failures.length} test failures in the "${category}" category.
+
+FAILURES:
+${JSON.stringify(failures, null, 2)}
+
+Identify:
+1. What pattern connects these failures?
+2. What are the common characteristics?
+3. What systemic fix would address multiple failures?
+
+Be specific about the pattern and provide an actionable fix.
+`;
+
+  const result = await generateWithFallback({
+    prompt,
+    systemPrompt: 'You are an expert at identifying patterns in test failures.',
+    schema: z.object({
+      pattern: z.string(),
+      commonCharacteristics: z.array(z.string()),
+      suggestedSystemicFix: z.string()
+    })
+  });
+
+  return {
+    pattern: result.pattern,
+    occurrences: failures.length,
+    affectedTests: [], // Would be populated with actual test IDs
+    commonCharacteristics: result.commonCharacteristics,
+    suggestedSystemicFix: result.suggestedSystemicFix
+  };
+}
+```
+
+### 11.4 Automated Triage
+
+```typescript
+// tests/analysis/triage.ts
+interface TriageResult {
+  priority: 'P0' | 'P1' | 'P2' | 'P3';
+  assignTo: 'frontend' | 'backend' | 'infrastructure' | 'qa';
+  blocksRelease: boolean;
+  suggestedAction: string;
+  estimatedEffort: 'trivial' | 'small' | 'medium' | 'large';
+}
+
+export async function triageFailure(
+  analysis: ErrorAnalysis,
+  testContext: TestSession
+): Promise<TriageResult> {
+  // Determine priority based on impact and confidence
+  let priority: TriageResult['priority'] = 'P3';
+
+  if (analysis.potentialImpact === 'critical') {
+    priority = 'P0';
+  } else if (analysis.potentialImpact === 'high') {
+    priority = 'P1';
+  } else if (analysis.potentialImpact === 'medium') {
+    priority = 'P2';
+  }
+
+  // Determine team assignment based on category
+  const teamMap: Record<string, TriageResult['assignTo']> = {
+    'ui_interaction_failure': 'frontend',
+    'timing_issue': 'frontend',
+    'data_validation_error': 'backend',
+    'network_error': 'infrastructure',
+    'auth_failure': 'backend',
+    'business_logic_error': 'backend',
+    'environmental_issue': 'infrastructure',
+    'unknown': 'qa'
+  };
+
+  return {
+    priority,
+    assignTo: teamMap[analysis.category] || 'qa',
+    blocksRelease: priority === 'P0' || priority === 'P1',
+    suggestedAction: analysis.suggestedFix,
+    estimatedEffort: analysis.isFlaky ? 'trivial' : 'medium'
+  };
+}
+```
+
+---
+
+## 12. AI Operations Testing
+
+### 12.1 Testing AI Components
+
+AI operations require special testing approaches because outputs are non-deterministic:
+
+```typescript
+// tests/ai/ai-testing-strategy.ts
+
+/**
+ * AI Testing Strategy
+ *
+ * We test AI operations at three levels:
+ * 1. Schema Validation: Outputs match expected Zod schemas
+ * 2. Quality Assertions: Outputs meet quality criteria
+ * 3. LLM-as-Judge: Independent AI evaluates output quality
+ */
+```
+
+### 12.2 Schema Validation Tests
+
+```typescript
+// tests/ai/schema-validation.test.ts
+import { describe, it, expect } from 'vitest';
+import { BehaviorSuggestionModule } from '@/lib/ai/modules/behavior-suggestion';
+import { BehaviorSuggestionOutputSchema } from '@/lib/ai/schemas';
+
+describe('AI Schema Validation', () => {
+  const module = new BehaviorSuggestionModule();
+
+  it('behavior suggestion output matches schema', async () => {
+    const result = await module.execute({
+      roleType: 'SERVER',
+      industry: 'RESTAURANT',
+      focusKpis: ['AVERAGE_CHECK', 'REVENUE']
+    });
+
+    // Schema validation
+    const validation = BehaviorSuggestionOutputSchema.safeParse(result.output);
+    expect(validation.success).toBe(true);
+
+    // Structure checks
+    expect(result.output.behaviors).toBeInstanceOf(Array);
+    expect(result.output.behaviors.length).toBeGreaterThanOrEqual(3);
+    expect(result.output.behaviors.length).toBeLessThanOrEqual(7);
+
+    // Each behavior has required fields
+    for (const behavior of result.output.behaviors) {
+      expect(behavior.name).toBeTruthy();
+      expect(behavior.description).toBeTruthy();
+      expect(behavior.targetPerShift).toBeGreaterThan(0);
+      expect(behavior.points).toBeGreaterThan(0);
+      expect(behavior.rationale).toBeTruthy();
+    }
+  });
+});
+```
+
+### 12.3 Quality Assertion Tests
+
+```typescript
+// tests/ai/quality-assertions.test.ts
+import { describe, it, expect } from 'vitest';
+import { InsightModule } from '@/lib/ai/modules/insight';
+
+describe('AI Quality Assertions', () => {
+  const module = new InsightModule();
+
+  it('generated insights are actionable', async () => {
+    const result = await module.execute({
+      revenue: 4500,
+      revenueVsBenchmark: 110,
+      avgCheck: 55,
+      adoptionRate: 78
+    });
+
+    // Quality checks
+    for (const insight of result.output.insights) {
+      // Titles should not be generic
+      expect(insight.title).not.toMatch(/^(Good job|Keep going|Performance)/i);
+
+      // Recommendations should be actionable (contain action verbs)
+      const actionVerbs = ['should', 'try', 'consider', 'increase', 'decrease', 'focus'];
+      const hasActionVerb = insight.recommendations.every(
+        rec => actionVerbs.some(verb => rec.toLowerCase().includes(verb))
+      );
+      expect(hasActionVerb).toBe(true);
+
+      // Metrics should be included for non-info insights
+      if (insight.type !== 'info') {
+        expect(insight.metric).toBeDefined();
+      }
+    }
+  });
+});
+```
+
+### 12.4 LLM-as-Judge Tests
+
+```typescript
+// tests/ai/llm-judge.test.ts
+import { describe, it, expect } from 'vitest';
+import { judgeOutput } from '@/lib/ai/quality/judge';
+import { BehaviorSuggestionModule } from '@/lib/ai/modules/behavior-suggestion';
+
+describe('LLM-as-Judge Quality Tests', () => {
+  const module = new BehaviorSuggestionModule();
+
+  it('behavior suggestions pass quality judgment', async () => {
+    const input = {
+      roleType: 'SERVER',
+      industry: 'RESTAURANT',
+      focusKpis: ['AVERAGE_CHECK']
+    };
+
+    const result = await module.execute(input);
+
+    const judgment = await judgeOutput(
+      'behavior_suggestion',
+      input,
+      result.output,
+      [
+        'Behaviors are specific and measurable',
+        'Targets are realistic for a restaurant server',
+        'Scripts are natural and not robotic',
+        'Rationale clearly links to average check improvement',
+        'No duplicate or overlapping behaviors',
+        'Behaviors are within server control (not kitchen/management tasks)'
+      ]
+    );
+
+    expect(judgment.score).toBeGreaterThanOrEqual(70);
+    expect(judgment.passed).toBe(true);
+
+    // Log judgment for analysis
+    console.log('Judgment:', {
+      score: judgment.score,
+      feedback: judgment.feedback,
+      suggestions: judgment.suggestions
+    });
+  });
+
+  it('flags low-quality outputs', async () => {
+    // Test with a known problematic input that might produce weak results
+    const input = {
+      roleType: 'UNKNOWN_ROLE',
+      industry: 'GENERIC',
+      focusKpis: ['VAGUE_METRIC']
+    };
+
+    const result = await module.execute(input);
+
+    const judgment = await judgeOutput(
+      'behavior_suggestion',
+      input,
+      result.output,
+      [
+        'Behaviors are specific to the role',
+        'Behaviors are industry-appropriate',
+        'KPI linkage is clear'
+      ]
+    );
+
+    // Expect lower scores for vague inputs
+    if (judgment.score < 70) {
+      expect(judgment.suggestions.length).toBeGreaterThan(0);
+    }
+  });
+});
+```
+
+### 12.5 Token & Cost Tracking Tests
+
+```typescript
+// tests/ai/cost-tracking.test.ts
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { withTokenTracking, calculateCost } from '@/lib/ai/tracking/tokens';
+import { BehaviorSuggestionModule } from '@/lib/ai/modules/behavior-suggestion';
+
+describe('AI Cost Tracking', () => {
+  let originalModule: BehaviorSuggestionModule;
+  let trackedModule: BehaviorSuggestionModule;
+
+  beforeEach(() => {
+    originalModule = new BehaviorSuggestionModule();
+    trackedModule = withTokenTracking(originalModule, 'test-org');
+  });
+
+  it('tracks token usage for each operation', async () => {
+    const result = await trackedModule.execute({
+      roleType: 'SERVER',
+      industry: 'RESTAURANT',
+      focusKpis: ['AVERAGE_CHECK']
+    });
+
+    expect(result.metadata.tokensUsed).toBeGreaterThan(0);
+    expect(result.metadata.latencyMs).toBeGreaterThan(0);
+  });
+
+  it('calculates cost correctly', () => {
+    // GPT-4 Turbo pricing
+    const cost = calculateCost('gpt-4-turbo', 1000, 500);
+    expect(cost).toBe((1000 * 0.01 + 500 * 0.03) / 1000);
+
+    // Claude pricing
+    const claudeCost = calculateCost('claude-3-sonnet', 1000, 500);
+    expect(claudeCost).toBe((1000 * 0.003 + 500 * 0.015) / 1000);
+  });
+
+  it('logs operations for aggregation', async () => {
+    await trackedModule.execute({
+      roleType: 'SERVER',
+      industry: 'RESTAURANT',
+      focusKpis: ['AVERAGE_CHECK']
+    });
+
+    const logs = await getOperationLogs('test-org', {
+      start: new Date(Date.now() - 60000),
+      end: new Date()
+    });
+
+    expect(logs.length).toBeGreaterThan(0);
+    expect(logs[0]).toMatchObject({
+      operation: 'behavior_suggestion',
+      organizationId: 'test-org',
+      success: true
+    });
+  });
+});
+```
+
+### 12.6 Regression Testing for AI
+
+```typescript
+// tests/ai/regression.test.ts
+import { describe, it, expect } from 'vitest';
+import { InsightModule } from '@/lib/ai/modules/insight';
+
+/**
+ * AI Regression Tests
+ *
+ * These tests use known inputs with expected output characteristics
+ * to catch regressions in AI behavior.
+ */
+describe('AI Regression Tests', () => {
+  const module = new InsightModule();
+
+  // Golden test cases with known-good outputs
+  const goldenTests = [
+    {
+      name: 'high_performance_celebration',
+      input: {
+        revenue: 5000,
+        revenueVsBenchmark: 125,
+        avgCheck: 65,
+        adoptionRate: 95
+      },
+      expectations: {
+        shouldContainType: 'success',
+        shouldMentionCelebration: true,
+        shouldNotMention: ['concern', 'warning', 'drop']
+      }
+    },
+    {
+      name: 'low_performance_warning',
+      input: {
+        revenue: 2000,
+        revenueVsBenchmark: 75,
+        avgCheck: 35,
+        adoptionRate: 45
+      },
+      expectations: {
+        shouldContainType: 'warning',
+        shouldMentionConcern: true,
+        shouldNotMention: ['celebration', 'excellent']
+      }
+    }
+  ];
+
+  for (const test of goldenTests) {
+    it(`regression: ${test.name}`, async () => {
+      const result = await module.execute(test.input);
+
+      // Check expected insight types present
+      if (test.expectations.shouldContainType) {
+        const hasType = result.output.insights.some(
+          i => i.type === test.expectations.shouldContainType
+        );
+        expect(hasType).toBe(true);
+      }
+
+      // Check forbidden terms not present
+      if (test.expectations.shouldNotMention) {
+        const allText = JSON.stringify(result.output).toLowerCase();
+        for (const term of test.expectations.shouldNotMention) {
+          expect(allText).not.toContain(term.toLowerCase());
+        }
+      }
+    });
+  }
+});
+```
+
+### 12.7 CI Integration for AI Tests
+
+```yaml
+# .github/workflows/ai-tests.yml
+name: AI Operations Tests
+
+on:
+  push:
+    paths:
+      - 'lib/ai/**'
+      - 'tests/ai/**'
+  pull_request:
+    paths:
+      - 'lib/ai/**'
+      - 'tests/ai/**'
+
+jobs:
+  ai-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run AI schema tests
+        run: npm run test:ai:schema
+
+      - name: Run AI quality tests
+        run: npm run test:ai:quality
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
+      - name: Run LLM-as-Judge tests
+        run: npm run test:ai:judge
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
+      - name: Generate AI test report
+        run: npm run test:ai:report
+
+      - name: Upload AI test artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ai-test-report
+          path: test-reports/ai/
 ```
 
 ---

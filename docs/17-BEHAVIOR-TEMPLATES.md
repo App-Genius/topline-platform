@@ -9,11 +9,12 @@ This document provides comprehensive behavior templates for different roles and 
 ## Table of Contents
 
 1. [Template Structure](#1-template-structure)
-2. [Restaurant Templates](#2-restaurant-templates)
-3. [Retail Templates](#3-retail-templates)
-4. [Hospitality Templates](#4-hospitality-templates)
-5. [Back Office Templates](#5-back-office-templates)
-6. [Custom Template Creation](#6-custom-template-creation)
+2. [AI-Driven Template Generation](#2-ai-driven-template-generation)
+3. [Restaurant Templates](#3-restaurant-templates)
+4. [Retail Templates](#4-retail-templates)
+5. [Hospitality Templates](#5-hospitality-templates)
+6. [Back Office Templates](#6-back-office-templates)
+7. [Custom Template Creation](#7-custom-template-creation)
 
 ---
 
@@ -49,9 +50,302 @@ interface BehaviorTemplate {
 
 ---
 
-## 2. Restaurant Templates
+## 2. AI-Driven Template Generation
 
-### 2.1 Server Behaviors
+### 2.1 Dynamic Scaffolding Philosophy
+
+The behavior templates in this document serve as **examples and training data** for our AI system. In production, the AI **generates custom behaviors** for each business based on:
+
+- Industry type and sub-type
+- Business size and structure
+- Role definitions specific to the organization
+- Focus KPIs and business objectives
+- Regional/cultural considerations
+- Historical performance data (if available)
+
+### 2.2 Generation Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              AI BEHAVIOR GENERATION PIPELINE                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  INPUT                                                           │
+│  ├── Business Description: "Boutique hotel with spa and          │
+│  │    fine dining restaurant, 45 rooms, mid-luxury segment"      │
+│  ├── Role: "Spa Therapist"                                       │
+│  └── Focus KPIs: [Revenue Per Treatment, Rebooking Rate]         │
+│                                                                  │
+│  CONTEXT RETRIEVAL                                               │
+│  ├── Similar industry templates (Hospitality + Spa)              │
+│  ├── Role-type mappings (Service + Upsell)                       │
+│  └── KPI correlation data from similar businesses                │
+│                                                                  │
+│  GENERATION                                                      │
+│  ├── Generate 5-7 candidate behaviors                            │
+│  ├── Calculate realistic targets based on role                   │
+│  ├── Create industry-appropriate scripts                         │
+│  └── Map expected KPI impacts                                    │
+│                                                                  │
+│  QUALITY ASSURANCE                                               │
+│  ├── Schema validation (Zod)                                     │
+│  ├── Quality assertions                                          │
+│  └── LLM-as-Judge evaluation                                     │
+│                                                                  │
+│  OUTPUT                                                          │
+│  └── Custom BehaviorTemplate[] for this specific role            │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 2.3 Generation Implementation
+
+```typescript
+// lib/ai/modules/behavior-generation.ts
+import { z } from 'zod';
+import { AIModule } from './base';
+
+const BehaviorGenerationInputSchema = z.object({
+  businessDescription: z.string(),
+  industry: z.string(),
+  industrySubtype: z.string().optional(),
+  roleName: z.string(),
+  roleType: z.enum([
+    'REVENUE_GENERATING',
+    'COST_CONTROLLING',
+    'QUALITY_FOCUSED',
+    'COMPLIANCE_FOCUSED',
+    'PRODUCTIVITY_FOCUSED'
+  ]),
+  focusKpis: z.array(z.string()),
+  shiftLength: z.number().optional(),
+  averageCustomerInteractions: z.number().optional(),
+  existingBehaviors: z.array(z.string()).optional()
+});
+
+const GeneratedBehaviorSchema = z.object({
+  name: z.string().max(50),
+  description: z.string().max(200),
+  category: z.enum(['REVENUE', 'COST_CONTROL', 'QUALITY', 'COMPLIANCE']),
+  frequency: z.enum(['PER_SHIFT', 'PER_DAY', 'PER_WEEK', 'PER_MONTH']),
+  defaultTarget: z.number().min(1),
+  defaultPoints: z.number().min(1).max(10),
+  kpiImpact: z.array(z.string()),
+  examples: z.array(z.string()).min(2).max(4),
+  tips: z.array(z.string()).min(2).max(4),
+  script: z.string().optional(),
+  rationale: z.string().max(200)
+});
+
+export class BehaviorGenerationModule extends AIModule<
+  z.infer<typeof BehaviorGenerationInputSchema>,
+  { behaviors: z.infer<typeof GeneratedBehaviorSchema>[] }
+> {
+  protected buildPrompt(input: BehaviorGenerationInput): string {
+    return `
+You are an expert in designing measurable workplace behaviors that drive KPI improvements.
+
+BUSINESS CONTEXT:
+- Description: ${input.businessDescription}
+- Industry: ${input.industry}${input.industrySubtype ? ` (${input.industrySubtype})` : ''}
+- Role: ${input.roleName}
+- Role Type: ${input.roleType}
+- Focus KPIs: ${input.focusKpis.join(', ')}
+${input.shiftLength ? `- Typical Shift: ${input.shiftLength} hours` : ''}
+${input.averageCustomerInteractions ? `- Customer Interactions: ~${input.averageCustomerInteractions}/shift` : ''}
+${input.existingBehaviors?.length ? `- Existing Behaviors (don't duplicate): ${input.existingBehaviors.join(', ')}` : ''}
+
+Generate 5-7 specific, measurable behaviors for this role that will drive the focus KPIs.
+
+FOR EACH BEHAVIOR:
+1. Name: Action-oriented, specific (max 50 chars)
+2. Description: What exactly to do (max 200 chars)
+3. Category: REVENUE, COST_CONTROL, QUALITY, or COMPLIANCE
+4. Frequency: How often this should be done
+5. Target: Realistic number based on shift/opportunity
+6. Points: 1-10 based on effort and impact
+7. KPI Impact: Which KPIs this affects
+8. Examples: 2-4 specific examples with actual words to say
+9. Tips: 2-4 practical tips for success
+10. Script: If applicable, exact words to use
+11. Rationale: Why this behavior drives the KPIs
+
+REQUIREMENTS:
+- Behaviors must be within the role's control
+- Targets must be achievable in a typical shift
+- Scripts should sound natural, not robotic
+- Each behavior should clearly link to at least one focus KPI
+- Avoid generic behaviors - be specific to this industry/role
+
+Return as JSON array of behaviors.
+`;
+  }
+}
+```
+
+### 2.4 Industry Adaptation Examples
+
+The AI adapts the same core concepts to different industries:
+
+**Example: "Upsell" behavior across industries**
+
+| Industry | Role | Behavior Name | Example Script |
+|----------|------|---------------|----------------|
+| Restaurant | Server | Suggest Wine Pairing | "May I suggest a wine to complement your steak? Our Cabernet is excellent." |
+| Hotel | Front Desk | Offer Room Upgrade | "For just $30 more, I can put you in a suite with a view." |
+| Spa | Therapist | Recommend Add-On Treatment | "Since you enjoyed the massage, would you like to add a hot stone enhancement?" |
+| Auto Service | Advisor | Suggest Preventive Service | "Your car is due for transmission fluid - doing it now saves $50 vs next visit." |
+| Dental | Hygienist | Present Treatment Option | "I noticed some sensitivity - would you like to discuss sealants with Dr. Smith?" |
+| Accounting | Associate | Cross-Sell Service | "Based on your tax situation, our estate planning service could save you significantly." |
+
+### 2.5 Universal Role-Type Mappings
+
+The AI understands universal role types that apply across industries:
+
+```typescript
+const UNIVERSAL_ROLE_PATTERNS = {
+  REVENUE_GENERATING: {
+    behaviors: ['upsell', 'cross_sell', 'premium_suggest', 'add_on_offer'],
+    kpis: ['AVERAGE_CHECK', 'REVENUE', 'CONVERSION_RATE']
+  },
+
+  COST_CONTROLLING: {
+    behaviors: ['vendor_compare', 'waste_track', 'inventory_verify', 'efficiency_log'],
+    kpis: ['COST_PERCENTAGE', 'WASTE_PERCENTAGE', 'INVENTORY_VARIANCE']
+  },
+
+  QUALITY_FOCUSED: {
+    behaviors: ['satisfaction_check', 'feedback_request', 'issue_resolve', 'follow_up'],
+    kpis: ['SATISFACTION_SCORE', 'RATING', 'NPS']
+  },
+
+  COMPLIANCE_FOCUSED: {
+    behaviors: ['checklist_complete', 'documentation_verify', 'safety_check', 'audit_prep'],
+    kpis: ['COMPLIANCE_RATE', 'AUDIT_SCORE', 'INCIDENT_RATE']
+  },
+
+  PRODUCTIVITY_FOCUSED: {
+    behaviors: ['task_complete', 'time_track', 'efficiency_log', 'milestone_update'],
+    kpis: ['THROUGHPUT', 'CYCLE_TIME', 'UTILIZATION']
+  }
+};
+```
+
+### 2.6 Learning from Feedback
+
+The AI improves its behavior generation based on:
+
+```typescript
+interface BehaviorFeedback {
+  behaviorId: string;
+  adoptionRate: number;      // How often staff actually do it
+  correlationScore: number;  // How well it correlates with KPI
+  staffFeedback: string[];   // Direct feedback from staff
+  managerNotes: string[];    // Manager observations
+}
+
+// The system tracks which generated behaviors work well
+async function evaluateGeneratedBehavior(
+  organizationId: string,
+  behaviorId: string
+): Promise<BehaviorFeedback> {
+  const behavior = await getBehavior(behaviorId);
+  const logs = await getBehaviorLogs(behaviorId, { days: 30 });
+  const correlations = await getCorrelations(behaviorId);
+
+  return {
+    behaviorId,
+    adoptionRate: logs.length / expectedLogs,
+    correlationScore: correlations.primaryKpi,
+    staffFeedback: await getStaffFeedback(behaviorId),
+    managerNotes: await getManagerNotes(behaviorId)
+  };
+}
+
+// Feed back to improve future generations
+async function improveGenerationPrompts(
+  feedback: BehaviorFeedback[]
+): Promise<void> {
+  const lowPerformers = feedback.filter(f =>
+    f.adoptionRate < 0.3 || f.correlationScore < 0.2
+  );
+
+  const highPerformers = feedback.filter(f =>
+    f.adoptionRate > 0.7 && f.correlationScore > 0.5
+  );
+
+  // Update few-shot examples with high performers
+  // Analyze low performers for common issues
+  await updatePromptExamples(highPerformers);
+  await analyzeFailurePatterns(lowPerformers);
+}
+```
+
+### 2.7 New Industry Onboarding
+
+When a business from a new industry type joins, the AI:
+
+1. **Analyzes the business description** to understand operations
+2. **Maps to closest existing templates** for initial scaffolding
+3. **Generates industry-specific adaptations** for terminology
+4. **Creates role-appropriate behaviors** based on universal patterns
+5. **Sets reasonable defaults** based on similar businesses
+6. **Refines over time** based on actual performance data
+
+```typescript
+async function onboardNewIndustry(
+  businessDescription: string
+): Promise<IndustryScaffolding> {
+  // Step 1: Classify the business
+  const classification = await classifyBusiness(businessDescription);
+
+  // Step 2: Generate KPI structure
+  const kpis = await generateKPIs({
+    industry: classification.industry,
+    subtype: classification.subtype,
+    businessSize: classification.estimatedSize,
+    focusAreas: classification.focusAreas
+  });
+
+  // Step 3: Generate role templates
+  const roles = await generateRoles({
+    businessDescription,
+    industry: classification.industry,
+    typicalStaffing: classification.estimatedStaffing
+  });
+
+  // Step 4: Generate behaviors for each role
+  const behaviors = await Promise.all(
+    roles.map(role => generateBehaviors({
+      businessDescription,
+      industry: classification.industry,
+      role: role.name,
+      roleType: role.type,
+      focusKpis: role.relevantKpis
+    }))
+  );
+
+  // Step 5: Generate language mappings
+  const terminology = await generateTerminology({
+    industry: classification.industry,
+    standardTerms: ['covers', 'check', 'table', 'shift']
+  });
+
+  return {
+    industry: classification,
+    kpis,
+    roles,
+    behaviors: behaviors.flat(),
+    terminology
+  };
+}
+```
+
+---
+
+## 3. Restaurant Templates
+
+### 3.1 Server Behaviors
 
 #### Upsell Appetizer
 ```yaml
@@ -158,7 +452,7 @@ tips:
   - Report common feedback to manager
 ```
 
-### 2.2 Host Behaviors
+### 3.2 Host Behaviors
 
 #### VIP Recognition
 ```yaml
@@ -202,7 +496,7 @@ tips:
   - Acknowledge the wait apologetically
 ```
 
-### 2.3 Bartender Behaviors
+### 3.3 Bartender Behaviors
 
 #### Suggest Premium Spirits
 ```yaml
@@ -248,9 +542,9 @@ tips:
 
 ---
 
-## 3. Retail Templates
+## 4. Retail Templates
 
-### 3.1 Sales Associate Behaviors
+### 4.1 Sales Associate Behaviors
 
 #### Greet Within 30 Seconds
 ```yaml
@@ -317,9 +611,9 @@ tips:
 
 ---
 
-## 4. Hospitality Templates
+## 5. Hospitality Templates
 
-### 4.1 Front Desk Behaviors
+### 5.1 Front Desk Behaviors
 
 #### Personalized Welcome
 ```yaml
@@ -386,9 +680,9 @@ tips:
 
 ---
 
-## 5. Back Office Templates
+## 6. Back Office Templates
 
-### 5.1 Purchaser Behaviors
+### 6.1 Purchaser Behaviors
 
 #### Three-Quote Comparison
 ```yaml
@@ -432,7 +726,7 @@ tips:
   - Follow up on credits owed
 ```
 
-### 5.2 Chef Behaviors
+### 6.2 Chef Behaviors
 
 #### Menu Engineering Review
 ```yaml
@@ -476,7 +770,7 @@ tips:
   - Update briefing notes
 ```
 
-### 5.3 Accountant Behaviors
+### 6.3 Accountant Behaviors
 
 #### Invoice Processing Same Day
 ```yaml
@@ -520,7 +814,7 @@ tips:
   - Know credit terms per customer
 ```
 
-### 5.4 Facilities Behaviors
+### 6.4 Facilities Behaviors
 
 #### Utility Reading
 ```yaml
@@ -566,9 +860,9 @@ tips:
 
 ---
 
-## 6. Custom Template Creation
+## 7. Custom Template Creation
 
-### 6.1 Creating Custom Behaviors
+### 7.1 Creating Custom Behaviors
 
 When creating custom behaviors, consider:
 
@@ -588,7 +882,7 @@ When creating custom behaviors, consider:
 - Based on shift length and opportunity
 - Achievable but challenging
 
-### 6.2 Custom Behavior Template
+### 7.2 Custom Behavior Template
 
 ```yaml
 name: [Clear, Action-Oriented Name]
@@ -609,7 +903,7 @@ tips:
   - [Helpful tip 3]
 ```
 
-### 6.3 Behavior Naming Best Practices
+### 7.3 Behavior Naming Best Practices
 
 | Good Names | Bad Names |
 |------------|-----------|
@@ -618,7 +912,7 @@ tips:
 | Three-Quote Comparison | Save Money |
 | Table Touch | Good Service |
 
-### 6.4 Setting Targets
+### 7.4 Setting Targets
 
 **Per-Shift Behaviors:**
 - Calculate: (Hours × Opportunity Rate) × Success Rate

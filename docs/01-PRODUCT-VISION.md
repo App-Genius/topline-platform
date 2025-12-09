@@ -8,6 +8,86 @@ The core hypothesis: **If team members consistently execute specific behaviors, 
 
 ---
 
+## Core System Principles
+
+These principles govern ALL development decisions and must be adhered to rigorously:
+
+### Principle 1: Stay Focused on Lag & Lead Measures
+
+The system exists for ONE purpose: connecting behaviors (lead measures) to KPIs (lag measures). Every feature must pass this test:
+
+> "Does this feature directly help measure, track, or improve the connection between behaviors and KPIs?"
+
+**DO:**
+- Build features that track behaviors
+- Build features that measure KPIs
+- Build features that analyze behavior→KPI correlations
+- Build features that help teams execute better
+
+**DON'T:**
+- Add features because competitors have them
+- Build integrations that don't feed into KPI tracking
+- Create complexity that doesn't serve the core loop
+
+### Principle 2: Industry-Agnostic by Design
+
+Topline is NOT a restaurant app, NOT a retail app, NOT a hospitality app. It's a **universal behavior-to-outcome system** that adapts to ANY business:
+
+- **Restaurants**: Server suggests wine → Average check increases
+- **Hotels**: Front desk offers upgrade → RevPAR increases
+- **Accountants**: Staff checks vendor pricing → Cost reduction achieved
+- **Cleaning Services**: Tech completes room in target time → Productivity KPI met
+- **Landscapers**: Crew logs equipment maintenance → Equipment uptime improves
+- **Law Firms**: Associate tracks billable activities → Utilization rate increases
+
+The AI generates scaffolding, language, behaviors, and KPIs appropriate to each industry. The core engine remains the same.
+
+### Principle 3: Universal Quantification
+
+**Every role has measurable behaviors.** This is non-negotiable:
+
+| Role Type | Example Behaviors | Measurable Outcome |
+|-----------|-------------------|-------------------|
+| Revenue-generating | Upsell suggestions | Check increase |
+| Cost-controlling | Vendor comparisons | Cost reduction |
+| Quality-focused | Checklist completion | Quality score |
+| Compliance-focused | Documentation tasks | Audit readiness |
+| Productivity-focused | Time tracking | Efficiency metrics |
+
+If a role exists in a business, there are behaviors that can be tracked.
+
+### Principle 4: Integration Philosophy
+
+Integrations exist ONLY to ingest data. They should NEVER:
+- Bloat the core system
+- Add complexity to the user experience
+- Require the core system to depend on them
+
+**Approved Integration Patterns:**
+- POS systems → Revenue & transaction data ingestion
+- Scheduling systems → Staff hours data ingestion
+- Accounting systems → Cost data ingestion
+- Review platforms → Rating data ingestion
+
+**Data Ingestion Methods (in priority order):**
+1. Direct API integration (cleanest)
+2. Excel/CSV upload (most flexible)
+3. OCR/AI document parsing (invoices, receipts)
+4. Manual entry (always available as fallback)
+
+### Principle 5: Hide Complexity Behind Intelligence
+
+The system should feel simple to users while doing sophisticated work behind the scenes:
+
+- **Users see**: Simple behavior buttons to tap
+- **System does**: Statistical correlation analysis, fraud detection, AI insights
+- **Users see**: Clear "winning/losing" game state
+- **System does**: Multi-variable benchmark comparisons across time periods
+- **Users see**: Personalized coaching messages
+- **System does**: Context-aware AI with historical performance memory
+
+---
+
 ## Table of Contents
 
 1. [The Problem We Solve](#1-the-problem-we-solve)
@@ -1642,6 +1722,149 @@ Training:
 | Bar/Nightclub | $20-40 | 20-25% | 20-25% | 20-30% |
 | Hotel F&B | $40-80 | 30-35% | 35-40% | 35-45% |
 | Retail | $30-100 | 50-60% | 15-20% | 15-25% |
+
+---
+
+## Appendix C: AI-Driven Industry Scaffolding
+
+### How Industry Adaptation Works
+
+When a business onboards, the AI doesn't just pick from pre-built templates—it **generates** the entire scaffolding appropriate to their specific context:
+
+```
+INPUT: "I run a boutique hotel with 45 rooms and a small restaurant"
+
+AI GENERATES:
+├── Industry Context
+│   ├── Primary KPIs: RevPAR, ADR, Occupancy Rate, F&B Revenue
+│   ├── Secondary KPIs: Guest Satisfaction, Repeat Rate
+│   └── Cost KPIs: Labor %, F&B Cost %, Utility Cost per Occupied Room
+│
+├── Role Scaffolding
+│   ├── Front Desk → Check-in behaviors, upgrade offers, local recommendations
+│   ├── Housekeeping → Room completion time, quality checklist, maintenance reports
+│   ├── F&B Staff → Upsell behaviors (same as restaurant)
+│   └── Maintenance → Preventive maintenance logs, response time tracking
+│
+├── Language Customization
+│   ├── "Covers" → "Guests"
+│   ├── "Average Check" → "Average Daily Rate" (for rooms)
+│   ├── "Table Turnover" → "Room Turnover"
+│   └── Scripts use hospitality terminology
+│
+└── Benchmark Generation
+    ├── Industry-appropriate targets
+    ├── Seasonality considerations
+    └── Comparable property benchmarks
+```
+
+### Scaffolding Generation Process
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    SCAFFOLDING GENERATION                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. INDUSTRY CLASSIFICATION                                      │
+│     └── AI analyzes business description                        │
+│     └── Maps to industry taxonomy                               │
+│     └── Identifies hybrid models (hotel + restaurant)           │
+│                                                                  │
+│  2. KPI GENERATION                                               │
+│     └── Core KPIs for this industry                             │
+│     └── Custom KPIs based on business specifics                 │
+│     └── Calculation formulas                                    │
+│                                                                  │
+│  3. ROLE GENERATION                                              │
+│     └── Standard roles for industry                             │
+│     └── Custom roles based on staff description                 │
+│     └── Role-appropriate permissions                            │
+│                                                                  │
+│  4. BEHAVIOR GENERATION                                          │
+│     └── High-impact behaviors per role                          │
+│     └── Industry-specific scripts                               │
+│     └── Realistic targets                                       │
+│                                                                  │
+│  5. LANGUAGE CUSTOMIZATION                                       │
+│     └── Industry terminology mapping                            │
+│     └── UI label customization                                  │
+│     └── Report language adjustment                              │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Industry Examples
+
+**Professional Services (Accounting Firm)**
+```yaml
+kpis:
+  - Utilization Rate
+  - Realization Rate
+  - WIP Turnover
+  - Client Retention
+behaviors:
+  - Log billable time within 24 hours
+  - Review invoice before sending
+  - Schedule client check-in call
+  - Cross-sell additional service
+language:
+  covers: "clients"
+  average_check: "average engagement value"
+  table: "client account"
+```
+
+**Field Services (Landscaping)**
+```yaml
+kpis:
+  - Jobs Per Day
+  - Revenue Per Hour
+  - Equipment Uptime
+  - Customer Satisfaction
+behaviors:
+  - Complete job checklist
+  - Log equipment maintenance
+  - Capture completion photo
+  - Upsell additional service
+language:
+  covers: "jobs"
+  average_check: "average job value"
+  table: "work order"
+```
+
+**Healthcare (Dental Practice)**
+```yaml
+kpis:
+  - Production Per Hour
+  - Case Acceptance Rate
+  - Patient Retention
+  - Treatment Completion
+behaviors:
+  - Present treatment plan
+  - Schedule follow-up appointment
+  - Complete patient notes same-day
+  - Verify insurance coverage
+language:
+  covers: "patients"
+  average_check: "average case value"
+  table: "appointment"
+```
+
+### Self-Improving Scaffolding
+
+The AI doesn't stop at initial generation. It continuously improves:
+
+```
+Week 1: AI generates initial behaviors
+        ↓
+Week 4: System analyzes which behaviors correlate with KPIs
+        ↓
+Week 8: AI suggests behavior modifications
+        "Wine pairing suggestions show 0.82 correlation with avg check.
+         Dessert suggestions show only 0.31 correlation.
+         RECOMMENDATION: Replace dessert script with appetizer upsell."
+        ↓
+Ongoing: Behaviors evolve based on what actually works for THIS business
+```
 
 ---
 

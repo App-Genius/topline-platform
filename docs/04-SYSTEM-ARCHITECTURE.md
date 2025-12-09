@@ -109,7 +109,7 @@ This document provides a comprehensive technical architecture specification for 
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
 │  │ AI Provider │  │ File Storage│  │ Email       │  │ Analytics   │        │
-│  │ (OpenRouter)│  │ (S3/R2)     │  │ (Resend)    │  │ (PostHog)   │        │
+│  │ (OpenRouter)│  │ (S3/R2)     │  │ (Resend)    │  │ (Swappable) │        │
 │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘        │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -1989,6 +1989,256 @@ app.get('/health', async (c) => {
     },
   }, healthy ? 200 : 503)
 })
+```
+
+### 14.4 Analytics Abstraction Layer
+
+The analytics layer is designed to be **provider-agnostic** and swappable. Currently using MixPanel, but can switch to PostHog, Amplitude, or custom solutions.
+
+#### Architecture Principle
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    ANALYTICS ABSTRACTION                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Application Code                                                │
+│       │                                                          │
+│       ▼                                                          │
+│  ┌─────────────────────────────────────┐                        │
+│  │     Analytics Interface             │                        │
+│  │     analytics.track(event, props)   │                        │
+│  │     analytics.identify(user)        │                        │
+│  │     analytics.page(name)            │                        │
+│  └─────────────────────────────────────┘                        │
+│       │                                                          │
+│       ▼                                                          │
+│  ┌─────────────────────────────────────┐                        │
+│  │     Provider Adapter                │                        │
+│  │     (MixPanel / PostHog / Custom)   │                        │
+│  └─────────────────────────────────────┘                        │
+│       │                                                          │
+│       ▼                                                          │
+│  External Analytics Service                                      │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Analytics Interface
+
+```typescript
+// lib/analytics/interface.ts
+export interface AnalyticsProvider {
+  init(): void;
+  identify(userId: string, traits?: Record<string, unknown>): void;
+  track(event: string, properties?: EventProperties): void;
+  page(name: string, properties?: Record<string, unknown>): void;
+  reset(): void;
+}
+
+export interface EventProperties {
+  // Base properties included with every event
+  timestamp?: Date;
+  userId?: string;
+  organizationId?: string;
+  sessionId?: string;
+
+  // Event-specific properties
+  [key: string]: unknown;
+}
+```
+
+#### Event Naming Convention
+
+All events follow strict naming conventions for consistency:
+
+```typescript
+// Event naming: snake_case with category prefix
+const EVENTS = {
+  // Behavior events
+  BEHAVIOR_LOGGED: 'behavior_logged',
+  BEHAVIOR_VERIFIED: 'behavior_verified',
+  BEHAVIOR_REJECTED: 'behavior_rejected',
+
+  // KPI events
+  KPI_VIEWED: 'kpi_viewed',
+  KPI_TARGET_SET: 'kpi_target_set',
+  KPI_THRESHOLD_BREACHED: 'kpi_threshold_breached',
+
+  // User events
+  USER_LOGIN: 'user_login',
+  USER_LOGOUT: 'user_logout',
+  USER_PIN_LOGIN: 'user_pin_login',
+
+  // Dashboard events
+  DASHBOARD_VIEWED: 'dashboard_viewed',
+  INSIGHT_CLICKED: 'insight_clicked',
+  SCOREBOARD_VIEWED: 'scoreboard_viewed',
+
+  // AI events
+  AI_INSIGHT_GENERATED: 'ai_insight_generated',
+  AI_COACH_MESSAGE_SHOWN: 'ai_coach_message_shown',
+  AI_RECOMMENDATION_ACCEPTED: 'ai_recommendation_accepted',
+
+  // Error events
+  ERROR_API: 'error_api',
+  ERROR_UI: 'error_ui',
+  ERROR_AI: 'error_ai',
+} as const;
+```
+
+#### Property Standards
+
+```typescript
+// Standard property shapes for common event types
+interface BehaviorEventProps extends EventProperties {
+  behaviorId: string;
+  behaviorName: string;
+  category: 'REVENUE' | 'COST_CONTROL' | 'QUALITY' | 'COMPLIANCE';
+  roleType: string;
+  pointsEarned?: number;
+  wasVerified?: boolean;
+}
+
+interface KPIEventProps extends EventProperties {
+  kpiType: string;
+  currentValue: number;
+  targetValue?: number;
+  benchmarkValue?: number;
+  variance?: number;
+}
+
+interface AIEventProps extends EventProperties {
+  model: string;
+  promptType: string;
+  tokensUsed: number;
+  latencyMs: number;
+  wasSuccessful: boolean;
+  fallbackUsed?: boolean;
+}
+```
+
+#### MixPanel Adapter (Current)
+
+```typescript
+// lib/analytics/providers/mixpanel.ts
+import mixpanel from 'mixpanel-browser';
+import type { AnalyticsProvider, EventProperties } from '../interface';
+
+export class MixPanelAdapter implements AnalyticsProvider {
+  init() {
+    mixpanel.init(process.env.NEXT_PUBLIC_MIXPANEL_TOKEN!, {
+      debug: process.env.NODE_ENV === 'development',
+      track_pageview: true,
+      persistence: 'localStorage',
+    });
+  }
+
+  identify(userId: string, traits?: Record<string, unknown>) {
+    mixpanel.identify(userId);
+    if (traits) {
+      mixpanel.people.set(traits);
+    }
+  }
+
+  track(event: string, properties?: EventProperties) {
+    mixpanel.track(event, {
+      ...properties,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  page(name: string, properties?: Record<string, unknown>) {
+    mixpanel.track('page_viewed', {
+      page_name: name,
+      ...properties,
+    });
+  }
+
+  reset() {
+    mixpanel.reset();
+  }
+}
+```
+
+#### Usage Pattern
+
+```typescript
+// lib/analytics/index.ts
+import { MixPanelAdapter } from './providers/mixpanel';
+import type { AnalyticsProvider } from './interface';
+
+// Swap provider here without changing application code
+const provider: AnalyticsProvider = new MixPanelAdapter();
+
+export const analytics = {
+  init: () => provider.init(),
+  identify: (userId: string, traits?: Record<string, unknown>) =>
+    provider.identify(userId, traits),
+  track: (event: string, properties?: Record<string, unknown>) =>
+    provider.track(event, properties),
+  page: (name: string, properties?: Record<string, unknown>) =>
+    provider.page(name, properties),
+  reset: () => provider.reset(),
+};
+
+// Usage in components
+import { analytics } from '@/lib/analytics';
+
+// On behavior log
+analytics.track('behavior_logged', {
+  behaviorId: behavior.id,
+  behaviorName: behavior.name,
+  category: behavior.category,
+  roleType: user.role.type,
+});
+```
+
+#### Server-Side Analytics
+
+```typescript
+// Server-side tracking for backend events
+// lib/analytics/server.ts
+import Mixpanel from 'mixpanel';
+
+const mixpanel = Mixpanel.init(process.env.MIXPANEL_TOKEN!);
+
+export const serverAnalytics = {
+  track: (
+    event: string,
+    distinctId: string,
+    properties?: Record<string, unknown>
+  ) => {
+    mixpanel.track(event, {
+      distinct_id: distinctId,
+      ...properties,
+      $time: Date.now(),
+      source: 'server',
+    });
+  },
+
+  // Track AI operations with cost data
+  trackAIOperation: (props: {
+    userId: string;
+    organizationId: string;
+    model: string;
+    operation: string;
+    tokensUsed: number;
+    latencyMs: number;
+    success: boolean;
+  }) => {
+    mixpanel.track('ai_operation', {
+      distinct_id: props.userId,
+      organization_id: props.organizationId,
+      model: props.model,
+      operation: props.operation,
+      tokens_used: props.tokensUsed,
+      latency_ms: props.latencyMs,
+      success: props.success,
+      estimated_cost: calculateAICost(props.model, props.tokensUsed),
+    });
+  },
+};
 ```
 
 ---

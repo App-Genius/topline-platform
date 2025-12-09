@@ -4,6 +4,13 @@
 
 This document specifies how AI is integrated throughout the Topline system, including provider abstraction, structured outputs, prompt templates, and all AI-powered features.
 
+**Core AI Philosophy:**
+- All AI operations must be **deterministic** and **reproducible**
+- Every AI call must have **structured outputs** validated by Zod schemas
+- AI should **self-reflect** and **self-correct** when outputs don't meet quality standards
+- All AI operations must track **token usage** and **cost**
+- The system must **learn from feedback** to improve over time
+
 ---
 
 ## Table of Contents
@@ -20,6 +27,10 @@ This document specifies how AI is integrated throughout the Topline system, incl
 10. [Feedback Synthesis](#10-feedback-synthesis)
 11. [AI Coach System](#11-ai-coach-system)
 12. [Error Handling & Fallbacks](#12-error-handling--fallbacks)
+13. [DSPy-Style Prompt Engineering](#13-dspy-style-prompt-engineering)
+14. [Self-Reflection & Quality Assurance](#14-self-reflection--quality-assurance)
+15. [Token Tracking & Cost Management](#15-token-tracking--cost-management)
+16. [AI Self-Improvement Loop](#16-ai-self-improvement-loop)
 
 ---
 
@@ -1445,6 +1456,849 @@ function sleep(ms: number): Promise<void> {
 
 ---
 
+## 13. DSPy-Style Prompt Engineering
+
+### 13.1 Philosophy
+
+Inspired by [DSPy](https://github.com/stanfordnlp/dspy), our AI operations follow a **declarative, modular approach** to prompt engineering:
+
+- **Signatures**: Define what AI should produce (input → output)
+- **Modules**: Reusable prompt components that can be composed
+- **Optimizers**: Automatically improve prompts based on feedback
+- **Assertions**: Runtime checks on AI output quality
+
+### 13.2 Signature Definitions
+
+```typescript
+// lib/ai/signatures.ts
+import { z } from 'zod';
+
+// A Signature defines the contract for an AI operation
+interface Signature<TInput extends z.ZodType, TOutput extends z.ZodType> {
+  name: string;
+  description: string;
+  inputSchema: TInput;
+  outputSchema: TOutput;
+  examples?: Array<{
+    input: z.infer<TInput>;
+    output: z.infer<TOutput>;
+  }>;
+}
+
+// Example: Behavior Suggestion Signature
+export const BehaviorSuggestionSignature: Signature<
+  typeof BehaviorSuggestionInputSchema,
+  typeof BehaviorSuggestionOutputSchema
+> = {
+  name: 'suggest_behaviors',
+  description: 'Generate role-appropriate behaviors based on industry and KPI focus',
+  inputSchema: z.object({
+    roleType: z.string(),
+    industry: z.string(),
+    focusKpis: z.array(z.string()),
+    existingBehaviors: z.array(z.string()).optional(),
+    businessContext: z.string().optional(),
+  }),
+  outputSchema: z.object({
+    behaviors: z.array(z.object({
+      name: z.string().max(50),
+      description: z.string().max(200),
+      targetPerShift: z.number().min(1).max(50),
+      points: z.number().min(1).max(100),
+      expectedImpact: z.string(),
+      script: z.string().max(300).optional(),
+      rationale: z.string().max(200),
+    })).min(3).max(7),
+    reasoning: z.string(),
+  }),
+  examples: [
+    {
+      input: {
+        roleType: 'SERVER',
+        industry: 'RESTAURANT',
+        focusKpis: ['AVERAGE_CHECK', 'REVENUE'],
+      },
+      output: {
+        behaviors: [
+          {
+            name: 'Suggest Wine Pairing',
+            description: 'Recommend wine to complement the main course',
+            targetPerShift: 8,
+            points: 10,
+            expectedImpact: '+$8-12 per table average check',
+            script: 'May I suggest a wine to complement your meal? Our Pinot Noir pairs perfectly with that.',
+            rationale: 'Wine has high margin and drives check increases',
+          },
+        ],
+        reasoning: 'Wine pairing is high-impact for restaurants because...',
+      },
+    },
+  ],
+};
+```
+
+### 13.3 Module System
+
+```typescript
+// lib/ai/modules/base.ts
+import { z } from 'zod';
+
+export abstract class AIModule<TInput, TOutput> {
+  abstract signature: Signature<z.ZodType<TInput>, z.ZodType<TOutput>>;
+
+  // Core execution with all harness components
+  async execute(input: TInput): Promise<AIModuleResult<TOutput>> {
+    const startTime = Date.now();
+    const result: AIModuleResult<TOutput> = {
+      output: null as any,
+      metadata: {
+        tokensUsed: 0,
+        latencyMs: 0,
+        model: '',
+        attempts: 0,
+        reflectionUsed: false,
+        fallbackUsed: false,
+      },
+    };
+
+    try {
+      // Step 1: Build prompt from signature + input
+      const prompt = this.buildPrompt(input);
+
+      // Step 2: Execute with retry logic
+      const rawOutput = await this.executeWithRetry(prompt, result.metadata);
+
+      // Step 3: Validate output
+      const validated = this.signature.outputSchema.safeParse(rawOutput);
+
+      if (!validated.success) {
+        // Step 4: Self-reflection on validation failure
+        result.metadata.reflectionUsed = true;
+        const corrected = await this.selfReflect(input, rawOutput, validated.error);
+        result.output = corrected;
+      } else {
+        result.output = validated.data;
+      }
+
+      // Step 5: Quality assertions
+      await this.runAssertions(result.output);
+
+    } catch (error) {
+      // Step 6: Fallback
+      result.metadata.fallbackUsed = true;
+      result.output = await this.getFallback(input);
+    }
+
+    result.metadata.latencyMs = Date.now() - startTime;
+    return result;
+  }
+
+  protected abstract buildPrompt(input: TInput): string;
+  protected abstract selfReflect(
+    input: TInput,
+    failedOutput: unknown,
+    error: z.ZodError
+  ): Promise<TOutput>;
+  protected abstract runAssertions(output: TOutput): Promise<void>;
+  protected abstract getFallback(input: TInput): Promise<TOutput>;
+}
+
+interface AIModuleResult<T> {
+  output: T;
+  metadata: {
+    tokensUsed: number;
+    latencyMs: number;
+    model: string;
+    attempts: number;
+    reflectionUsed: boolean;
+    fallbackUsed: boolean;
+  };
+}
+```
+
+### 13.4 Prompt Templates with Harness
+
+```typescript
+// lib/ai/modules/behavior-suggestion.ts
+export class BehaviorSuggestionModule extends AIModule<
+  BehaviorSuggestionInput,
+  BehaviorSuggestionOutput
+> {
+  signature = BehaviorSuggestionSignature;
+
+  protected buildPrompt(input: BehaviorSuggestionInput): string {
+    // Include few-shot examples from signature
+    const examples = this.signature.examples
+      ?.map(ex => `
+Example Input: ${JSON.stringify(ex.input)}
+Example Output: ${JSON.stringify(ex.output)}
+`)
+      .join('\n');
+
+    return `
+You are an expert in designing measurable workplace behaviors that drive KPI improvements.
+
+TASK: Generate behaviors for the following context.
+
+INPUT:
+- Role: ${input.roleType}
+- Industry: ${input.industry}
+- Focus KPIs: ${input.focusKpis.join(', ')}
+${input.existingBehaviors?.length ? `- Existing behaviors (don't duplicate): ${input.existingBehaviors.join(', ')}` : ''}
+${input.businessContext ? `- Business context: ${input.businessContext}` : ''}
+
+${examples ? `EXAMPLES:\n${examples}` : ''}
+
+REQUIREMENTS:
+1. Each behavior must be specific and measurable
+2. Each behavior must clearly link to a focus KPI
+3. Provide realistic targets (what's achievable per shift)
+4. Include scripts where applicable
+5. Explain the rationale for each behavior
+
+OUTPUT: Respond with valid JSON matching this schema:
+${JSON.stringify(this.signature.outputSchema.shape, null, 2)}
+
+Think step by step about what behaviors would have the highest impact for this role and industry.
+`;
+  }
+
+  protected async selfReflect(
+    input: BehaviorSuggestionInput,
+    failedOutput: unknown,
+    error: z.ZodError
+  ): Promise<BehaviorSuggestionOutput> {
+    const reflectionPrompt = `
+Your previous response failed validation with these errors:
+${JSON.stringify(error.flatten(), null, 2)}
+
+Your previous response was:
+${JSON.stringify(failedOutput, null, 2)}
+
+Please correct your response to fix these validation errors.
+The corrected response must match the required schema exactly.
+
+Original input was:
+${JSON.stringify(input, null, 2)}
+
+Respond with ONLY the corrected JSON.
+`;
+
+    const corrected = await this.aiClient.generate({
+      prompt: reflectionPrompt,
+      systemPrompt: 'You are correcting a JSON response to match a schema.',
+    });
+
+    return this.signature.outputSchema.parse(corrected);
+  }
+
+  protected async runAssertions(output: BehaviorSuggestionOutput): Promise<void> {
+    // Quality assertions
+    const assertions = [
+      {
+        check: output.behaviors.length >= 3,
+        message: 'Must suggest at least 3 behaviors',
+      },
+      {
+        check: output.behaviors.every(b => b.targetPerShift <= 20),
+        message: 'Targets should be realistic (<=20 per shift)',
+      },
+      {
+        check: output.behaviors.every(b => b.rationale.length > 20),
+        message: 'Each behavior must have meaningful rationale',
+      },
+    ];
+
+    const failures = assertions.filter(a => !a.check);
+    if (failures.length > 0) {
+      throw new AIAssertionError(failures.map(f => f.message).join('; '));
+    }
+  }
+
+  protected async getFallback(
+    input: BehaviorSuggestionInput
+  ): Promise<BehaviorSuggestionOutput> {
+    // Return sensible defaults based on role type
+    return getDefaultBehaviors(input.roleType, input.industry);
+  }
+}
+```
+
+---
+
+## 14. Self-Reflection & Quality Assurance
+
+### 14.1 LLM-as-Judge Pattern
+
+For critical AI outputs, we use a second LLM call to evaluate quality:
+
+```typescript
+// lib/ai/quality/judge.ts
+interface JudgeResult {
+  score: number;        // 0-100
+  passed: boolean;      // score >= threshold
+  feedback: string;     // Explanation
+  suggestions: string[];// How to improve
+}
+
+const JudgeResultSchema = z.object({
+  score: z.number().min(0).max(100),
+  passed: z.boolean(),
+  feedback: z.string().max(500),
+  suggestions: z.array(z.string()).max(3),
+});
+
+export async function judgeOutput<T>(
+  operation: string,
+  input: unknown,
+  output: T,
+  criteria: string[]
+): Promise<JudgeResult> {
+  const prompt = `
+You are evaluating the quality of an AI-generated output.
+
+OPERATION: ${operation}
+INPUT: ${JSON.stringify(input, null, 2)}
+OUTPUT: ${JSON.stringify(output, null, 2)}
+
+EVALUATION CRITERIA:
+${criteria.map((c, i) => `${i + 1}. ${c}`).join('\n')}
+
+Score the output from 0-100 based on how well it meets the criteria.
+Provide specific feedback and suggestions for improvement.
+
+Respond with JSON:
+{
+  "score": <0-100>,
+  "passed": <true if score >= 70>,
+  "feedback": "<explanation of score>",
+  "suggestions": ["<improvement 1>", "<improvement 2>"]
+}
+`;
+
+  const result = await aiClient.generate({
+    prompt,
+    systemPrompt: 'You are a strict quality evaluator for AI outputs.',
+    schema: JudgeResultSchema,
+  });
+
+  return result;
+}
+
+// Usage
+const behaviors = await behaviorModule.execute(input);
+const judgment = await judgeOutput(
+  'behavior_suggestion',
+  input,
+  behaviors.output,
+  [
+    'Behaviors are specific and measurable',
+    'Targets are realistic for the role',
+    'Scripts are natural and not robotic',
+    'Rationale clearly links to KPI impact',
+    'No duplicate or overlapping behaviors',
+  ]
+);
+
+if (!judgment.passed) {
+  // Log for analysis, potentially retry or use fallback
+  await logLowQualityOutput(behaviors, judgment);
+}
+```
+
+### 14.2 Automated Quality Checks
+
+```typescript
+// lib/ai/quality/checks.ts
+type QualityCheck<T> = {
+  name: string;
+  check: (output: T) => boolean | Promise<boolean>;
+  severity: 'error' | 'warning';
+  message: string;
+};
+
+const insightQualityChecks: QualityCheck<Insight>[] = [
+  {
+    name: 'no_generic_titles',
+    check: (i) => !['Great job', 'Keep going', 'Performance update'].includes(i.title),
+    severity: 'warning',
+    message: 'Insight title should be specific, not generic',
+  },
+  {
+    name: 'recommendations_actionable',
+    check: (i) => i.recommendations.every(r => r.includes('should') || r.includes('try') || r.includes('consider')),
+    severity: 'warning',
+    message: 'Recommendations should be actionable',
+  },
+  {
+    name: 'metric_included',
+    check: (i) => i.metric !== undefined || i.type === 'info',
+    severity: 'error',
+    message: 'Non-info insights must include metric data',
+  },
+];
+
+async function runQualityChecks<T>(
+  output: T,
+  checks: QualityCheck<T>[]
+): Promise<{ passed: boolean; errors: string[]; warnings: string[] }> {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  for (const check of checks) {
+    const passed = await check.check(output);
+    if (!passed) {
+      if (check.severity === 'error') {
+        errors.push(`${check.name}: ${check.message}`);
+      } else {
+        warnings.push(`${check.name}: ${check.message}`);
+      }
+    }
+  }
+
+  return {
+    passed: errors.length === 0,
+    errors,
+    warnings,
+  };
+}
+```
+
+---
+
+## 15. Token Tracking & Cost Management
+
+### 15.1 Token Tracking Architecture
+
+```typescript
+// lib/ai/tracking/tokens.ts
+interface AIOperationLog {
+  id: string;
+  timestamp: Date;
+  operation: string;          // e.g., 'behavior_suggestion', 'insight_generation'
+  model: string;              // e.g., 'gpt-4-turbo', 'claude-3-sonnet'
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  estimatedCost: number;      // in USD
+  latencyMs: number;
+  organizationId: string;
+  userId?: string;
+  success: boolean;
+  fallbackUsed: boolean;
+  reflectionUsed: boolean;
+  qualityScore?: number;
+}
+
+// Cost per 1K tokens (update as pricing changes)
+const TOKEN_COSTS: Record<string, { input: number; output: number }> = {
+  'gpt-4-turbo': { input: 0.01, output: 0.03 },
+  'gpt-4': { input: 0.03, output: 0.06 },
+  'gpt-3.5-turbo': { input: 0.0005, output: 0.0015 },
+  'claude-3-opus': { input: 0.015, output: 0.075 },
+  'claude-3-sonnet': { input: 0.003, output: 0.015 },
+  'claude-3-haiku': { input: 0.00025, output: 0.00125 },
+};
+
+export function calculateCost(
+  model: string,
+  inputTokens: number,
+  outputTokens: number
+): number {
+  const costs = TOKEN_COSTS[model] ?? { input: 0.01, output: 0.03 };
+  return (inputTokens * costs.input + outputTokens * costs.output) / 1000;
+}
+```
+
+### 15.2 Tracking Middleware
+
+```typescript
+// lib/ai/tracking/middleware.ts
+export function withTokenTracking<T>(
+  aiClient: AIClient,
+  organizationId: string
+): AIClient {
+  return {
+    ...aiClient,
+    generate: async (options) => {
+      const startTime = Date.now();
+      let log: Partial<AIOperationLog> = {
+        timestamp: new Date(),
+        operation: options.operationType ?? 'unknown',
+        model: aiClient.config.model,
+        organizationId,
+      };
+
+      try {
+        const result = await aiClient.generate(options);
+
+        // Extract token counts from response metadata
+        log = {
+          ...log,
+          inputTokens: result.usage?.prompt_tokens ?? 0,
+          outputTokens: result.usage?.completion_tokens ?? 0,
+          totalTokens: result.usage?.total_tokens ?? 0,
+          latencyMs: Date.now() - startTime,
+          success: true,
+        };
+
+        log.estimatedCost = calculateCost(
+          log.model!,
+          log.inputTokens!,
+          log.outputTokens!
+        );
+
+        await saveOperationLog(log as AIOperationLog);
+        return result;
+
+      } catch (error) {
+        log = {
+          ...log,
+          latencyMs: Date.now() - startTime,
+          success: false,
+        };
+        await saveOperationLog(log as AIOperationLog);
+        throw error;
+      }
+    },
+  };
+}
+```
+
+### 15.3 Cost Aggregation & Alerts
+
+```typescript
+// lib/ai/tracking/aggregation.ts
+interface CostReport {
+  period: { start: Date; end: Date };
+  totalCost: number;
+  totalTokens: number;
+  byOperation: Record<string, { cost: number; count: number; avgLatency: number }>;
+  byOrganization: Record<string, { cost: number; count: number }>;
+  alerts: string[];
+}
+
+export async function generateCostReport(
+  organizationId: string,
+  period: { start: Date; end: Date }
+): Promise<CostReport> {
+  const logs = await getOperationLogs(organizationId, period);
+
+  const report: CostReport = {
+    period,
+    totalCost: 0,
+    totalTokens: 0,
+    byOperation: {},
+    byOrganization: {},
+    alerts: [],
+  };
+
+  for (const log of logs) {
+    report.totalCost += log.estimatedCost;
+    report.totalTokens += log.totalTokens;
+
+    // Aggregate by operation
+    if (!report.byOperation[log.operation]) {
+      report.byOperation[log.operation] = { cost: 0, count: 0, avgLatency: 0 };
+    }
+    report.byOperation[log.operation].cost += log.estimatedCost;
+    report.byOperation[log.operation].count += 1;
+  }
+
+  // Generate alerts
+  const dailyCost = report.totalCost / ((period.end.getTime() - period.start.getTime()) / 86400000);
+  if (dailyCost > 10) {
+    report.alerts.push(`High daily AI cost: $${dailyCost.toFixed(2)}/day`);
+  }
+
+  const failureRate = logs.filter(l => !l.success).length / logs.length;
+  if (failureRate > 0.1) {
+    report.alerts.push(`High AI failure rate: ${(failureRate * 100).toFixed(1)}%`);
+  }
+
+  return report;
+}
+```
+
+### 15.4 Budget Limits
+
+```typescript
+// lib/ai/tracking/limits.ts
+interface AIBudgetConfig {
+  dailyLimit: number;      // USD
+  monthlyLimit: number;    // USD
+  perOperationLimit: number;
+  alertThreshold: number;  // 0-1, percentage of limit
+}
+
+export async function checkBudgetBeforeOperation(
+  organizationId: string,
+  estimatedCost: number
+): Promise<{ allowed: boolean; reason?: string }> {
+  const config = await getAIBudgetConfig(organizationId);
+  const todaySpend = await getTodaySpend(organizationId);
+  const monthSpend = await getMonthSpend(organizationId);
+
+  if (todaySpend + estimatedCost > config.dailyLimit) {
+    return { allowed: false, reason: 'Daily AI budget exceeded' };
+  }
+
+  if (monthSpend + estimatedCost > config.monthlyLimit) {
+    return { allowed: false, reason: 'Monthly AI budget exceeded' };
+  }
+
+  // Send alert if approaching limit
+  if (todaySpend / config.dailyLimit > config.alertThreshold) {
+    await sendBudgetAlert(organizationId, 'daily', todaySpend, config.dailyLimit);
+  }
+
+  return { allowed: true };
+}
+```
+
+---
+
+## 16. AI Self-Improvement Loop
+
+### 16.1 Feedback Collection
+
+The system collects feedback on AI outputs to improve over time:
+
+```typescript
+// lib/ai/improvement/feedback.ts
+interface AIFeedback {
+  id: string;
+  operationLogId: string;   // Links to the original AI operation
+  operation: string;
+  input: unknown;
+  output: unknown;
+  feedbackType: 'explicit' | 'implicit';
+  rating?: number;          // 1-5 for explicit feedback
+  wasUsed?: boolean;        // For implicit (did user accept recommendation?)
+  corrections?: unknown;    // What the correct output should have been
+  timestamp: Date;
+}
+
+// Explicit feedback collection
+export async function collectExplicitFeedback(
+  operationLogId: string,
+  rating: number,
+  corrections?: unknown
+): Promise<void> {
+  await saveFeedback({
+    operationLogId,
+    feedbackType: 'explicit',
+    rating,
+    corrections,
+    timestamp: new Date(),
+  });
+}
+
+// Implicit feedback from user behavior
+export async function trackImplicitFeedback(
+  operationLogId: string,
+  wasUsed: boolean
+): Promise<void> {
+  await saveFeedback({
+    operationLogId,
+    feedbackType: 'implicit',
+    wasUsed,
+    timestamp: new Date(),
+  });
+}
+```
+
+### 16.2 Prompt Optimization
+
+```typescript
+// lib/ai/improvement/optimizer.ts
+interface PromptVersion {
+  id: string;
+  operation: string;
+  prompt: string;
+  version: number;
+  createdAt: Date;
+  performance: {
+    avgQualityScore: number;
+    avgLatency: number;
+    successRate: number;
+    sampleSize: number;
+  };
+  isActive: boolean;
+}
+
+export async function analyzePromptPerformance(
+  operation: string
+): Promise<{ currentVersion: PromptVersion; suggestions: string[] }> {
+  const currentVersion = await getActivePromptVersion(operation);
+  const feedback = await getFeedbackForOperation(operation, { limit: 100 });
+
+  // Analyze patterns in feedback
+  const lowRatedExamples = feedback.filter(f => f.rating && f.rating <= 2);
+  const unusedSuggestions = feedback.filter(f => f.wasUsed === false);
+
+  const suggestions: string[] = [];
+
+  if (lowRatedExamples.length > 10) {
+    suggestions.push(
+      `${lowRatedExamples.length} outputs rated poorly. Common issues: ${await analyzeCommonIssues(lowRatedExamples)}`
+    );
+  }
+
+  if (unusedSuggestions.length / feedback.length > 0.5) {
+    suggestions.push(
+      'More than 50% of suggestions are not being used. Consider adjusting output format or relevance.'
+    );
+  }
+
+  return { currentVersion, suggestions };
+}
+
+// Generate improved prompt based on feedback
+export async function generateImprovedPrompt(
+  operation: string
+): Promise<string> {
+  const { currentVersion, suggestions } = await analyzePromptPerformance(operation);
+  const feedback = await getFeedbackForOperation(operation, { limit: 50 });
+
+  const prompt = `
+You are optimizing an AI prompt based on user feedback.
+
+CURRENT PROMPT:
+${currentVersion.prompt}
+
+FEEDBACK SUMMARY:
+- Average quality score: ${currentVersion.performance.avgQualityScore}/100
+- Success rate: ${currentVersion.performance.successRate}%
+- Sample size: ${currentVersion.performance.sampleSize}
+
+IDENTIFIED ISSUES:
+${suggestions.join('\n')}
+
+EXAMPLES OF POOR OUTPUTS:
+${JSON.stringify(feedback.filter(f => f.rating && f.rating <= 2).slice(0, 3), null, 2)}
+
+EXAMPLES OF CORRECTIONS USERS MADE:
+${JSON.stringify(feedback.filter(f => f.corrections).slice(0, 3), null, 2)}
+
+Generate an improved version of the prompt that:
+1. Addresses the identified issues
+2. Incorporates patterns from user corrections
+3. Maintains the core functionality
+4. Is clear and unambiguous
+
+Return ONLY the improved prompt text.
+`;
+
+  return await aiClient.generate({ prompt });
+}
+```
+
+### 16.3 A/B Testing for Prompts
+
+```typescript
+// lib/ai/improvement/ab-testing.ts
+interface ABTest {
+  id: string;
+  operation: string;
+  variants: Array<{
+    id: string;
+    promptVersionId: string;
+    weight: number;  // 0-1, must sum to 1
+  }>;
+  startedAt: Date;
+  endsAt: Date;
+  status: 'running' | 'completed' | 'cancelled';
+  results?: {
+    winner: string;
+    confidence: number;
+    metrics: Record<string, { qualityScore: number; successRate: number }>;
+  };
+}
+
+export async function selectVariant(
+  operation: string,
+  organizationId: string
+): Promise<string> {
+  const activeTest = await getActiveABTest(operation);
+
+  if (!activeTest) {
+    // No test running, use active version
+    const active = await getActivePromptVersion(operation);
+    return active.prompt;
+  }
+
+  // Deterministic assignment based on org ID
+  const hash = hashString(`${organizationId}-${activeTest.id}`);
+  const random = hash / 0xffffffff;
+
+  let cumulative = 0;
+  for (const variant of activeTest.variants) {
+    cumulative += variant.weight;
+    if (random < cumulative) {
+      const version = await getPromptVersion(variant.promptVersionId);
+      return version.prompt;
+    }
+  }
+
+  // Fallback to first variant
+  const version = await getPromptVersion(activeTest.variants[0].promptVersionId);
+  return version.prompt;
+}
+```
+
+### 16.4 Historical Memory
+
+```typescript
+// lib/ai/improvement/memory.ts
+interface OrganizationAIContext {
+  organizationId: string;
+  // Learned patterns about this business
+  successfulBehaviors: Array<{
+    behaviorName: string;
+    correlation: number;
+    kpi: string;
+  }>;
+  // Previous recommendations and their outcomes
+  recommendationHistory: Array<{
+    recommendation: string;
+    wasAccepted: boolean;
+    outcome?: 'positive' | 'negative' | 'neutral';
+  }>;
+  // Business-specific terminology
+  terminology: Record<string, string>;
+  // Performance patterns
+  patterns: {
+    bestPerformingDays: string[];
+    seasonalTrends: string[];
+    commonChallenges: string[];
+  };
+}
+
+// Include historical context in prompts
+export async function buildContextualPrompt(
+  basePrompt: string,
+  organizationId: string
+): Promise<string> {
+  const context = await getOrganizationAIContext(organizationId);
+
+  if (!context) return basePrompt;
+
+  const contextSection = `
+BUSINESS CONTEXT (from historical data):
+- Successful behaviors: ${context.successfulBehaviors.map(b => `${b.behaviorName} (${b.correlation.toFixed(2)} correlation with ${b.kpi})`).join(', ')}
+- Previous recommendations that worked: ${context.recommendationHistory.filter(r => r.outcome === 'positive').map(r => r.recommendation).slice(0, 3).join('; ')}
+- Common challenges for this business: ${context.patterns.commonChallenges.join(', ')}
+
+Use this context to provide more relevant, personalized recommendations.
+`;
+
+  return `${basePrompt}\n\n${contextSection}`;
+}
+```
+
+---
+
 ## Summary
 
 The AI Operations layer provides:
@@ -1461,8 +2315,14 @@ The AI Operations layer provides:
 | **Feedback Synthesis** | Anonymous feedback analysis |
 | **AI Coach** | Real-time motivational messages |
 | **Error Handling** | Fallbacks, retries, validation |
+| **DSPy-Style Prompting** | Declarative signatures, modular design |
+| **Self-Reflection** | Auto-correction on validation failures |
+| **LLM-as-Judge** | Quality assurance on critical outputs |
+| **Token Tracking** | Cost monitoring and budget limits |
+| **Self-Improvement** | Feedback collection, prompt optimization, A/B testing |
+| **Historical Memory** | Context-aware recommendations |
 
-All AI responses are validated against Zod schemas to ensure predictable, type-safe outputs that the application can rely on.
+All AI responses are validated against Zod schemas to ensure predictable, type-safe outputs that the application can rely on. The system continuously improves based on feedback and usage patterns.
 
 ---
 

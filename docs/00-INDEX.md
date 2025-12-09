@@ -4,6 +4,8 @@
 
 This documentation suite provides comprehensive specifications for the Topline system - a behavior-driven business optimization platform built on the 4DX framework.
 
+**Core Philosophy:** Topline is an **industry-agnostic** behavior-to-outcome system. It connects daily team member behaviors (lead measures) to business outcomes (lag measures) across ANY business type - restaurants, hotels, accounting firms, landscapers, dental practices, and more. The AI generates appropriate scaffolding for each industry while the core engine remains the same.
+
 ---
 
 ## Document Structure
@@ -42,37 +44,77 @@ This documentation suite provides comprehensive specifications for the Topline s
 | [13-TESTING-STRATEGY.md](./13-TESTING-STRATEGY.md) | Test plans, scenarios, automation | QA, Engineering |
 | [14-SECURITY-COMPLIANCE.md](./14-SECURITY-COMPLIANCE.md) | Auth, authorization, data protection | Engineering, Security |
 
-### Operational Documents
+### Operational & Infrastructure Documents
 
 | Document | Purpose | Audience |
 |----------|---------|----------|
-| [15-ONBOARDING-PLAYBOOK.md](./15-ONBOARDING-PLAYBOOK.md) | Customer onboarding process | Sales, Support |
-| [16-TRAINING-CONTENT.md](./16-TRAINING-CONTENT.md) | Training topics, videos, scripts | Content, Support |
-| [17-BEHAVIOR-TEMPLATES.md](./17-BEHAVIOR-TEMPLATES.md) | Role-specific behavior libraries | Product, Support |
+| [15-ANALYTICS-LAYER.md](./15-ANALYTICS-LAYER.md) | Event tracking, analytics abstraction | Engineering, Product |
+| [16-INTEGRATION-PHILOSOPHY.md](./16-INTEGRATION-PHILOSOPHY.md) | Data ingestion strategy, integration patterns | Engineering |
+| [17-BEHAVIOR-TEMPLATES.md](./17-BEHAVIOR-TEMPLATES.md) | Role-specific behavior libraries, AI scaffolding | Product, Support |
 
 ---
 
 ## Document Status
 
-| Document | Status | Last Updated |
-|----------|--------|--------------|
-| 01-PRODUCT-VISION.md | ✅ Complete | Dec 2024 |
-| 02-USER-PERSONAS.md | ✅ Complete | Dec 2024 |
-| 03-USER-FLOWS.md | ✅ Complete | Dec 2024 |
-| 04-SYSTEM-ARCHITECTURE.md | ✅ Complete | Dec 2024 |
-| 05-DATABASE-SCHEMA.md | ✅ Complete | Dec 2024 |
-| 06-API-SPECIFICATION.md | ✅ Complete | Dec 2024 |
-| 07-FRONTEND-ARCHITECTURE.md | ✅ Complete | Dec 2024 |
-| 08-CALCULATION-ENGINE.md | ✅ Complete | Dec 2024 |
-| 09-AI-OPERATIONS.md | ✅ Complete | Dec 2024 |
-| 10-CORRELATION-ANALYSIS.md | ✅ Complete | Dec 2024 |
-| 11-REPORTING-ENGINE.md | ✅ Complete | Dec 2024 |
-| 12-IMPLEMENTATION-ROADMAP.md | ✅ Complete | Dec 2024 |
-| 13-TESTING-STRATEGY.md | ✅ Complete | Dec 2024 |
-| 14-SECURITY-COMPLIANCE.md | ✅ Complete | Dec 2024 |
-| 15-ONBOARDING-PLAYBOOK.md | 🔴 Not Started | - |
-| 16-TRAINING-CONTENT.md | 🔴 Not Started | - |
-| 17-BEHAVIOR-TEMPLATES.md | ✅ Complete | Dec 2024 |
+| Document | Status | Last Updated | Recent Changes |
+|----------|--------|--------------|----------------|
+| 01-PRODUCT-VISION.md | ✅ Complete | Dec 2024 | Added core principles, industry-agnostic philosophy, AI scaffolding |
+| 02-USER-PERSONAS.md | ✅ Complete | Dec 2024 | - |
+| 03-USER-FLOWS.md | ✅ Complete | Dec 2024 | - |
+| 04-SYSTEM-ARCHITECTURE.md | ✅ Complete | Dec 2024 | Added analytics abstraction layer (swappable MixPanel) |
+| 05-DATABASE-SCHEMA.md | ✅ Complete | Dec 2024 | - |
+| 06-API-SPECIFICATION.md | ✅ Complete | Dec 2024 | - |
+| 07-FRONTEND-ARCHITECTURE.md | ✅ Complete | Dec 2024 | - |
+| 08-CALCULATION-ENGINE.md | ✅ Complete | Dec 2024 | - |
+| 09-AI-OPERATIONS.md | ✅ Complete | Dec 2024 | Added DSPy-style prompts, self-reflection, LLM-as-judge, token tracking, self-improvement loop |
+| 10-CORRELATION-ANALYSIS.md | ✅ Complete | Dec 2024 | - |
+| 11-REPORTING-ENGINE.md | ✅ Complete | Dec 2024 | - |
+| 12-IMPLEMENTATION-ROADMAP.md | ✅ Complete | Dec 2024 | - |
+| 13-TESTING-STRATEGY.md | ✅ Complete | Dec 2024 | Added agentic testing (Chrome MCP), LLM-as-judge error analysis, AI operations testing |
+| 14-SECURITY-COMPLIANCE.md | ✅ Complete | Dec 2024 | - |
+| 15-ANALYTICS-LAYER.md | ✅ NEW | Dec 2024 | Event taxonomy, naming conventions, provider abstraction |
+| 16-INTEGRATION-PHILOSOPHY.md | ✅ NEW | Dec 2024 | Data ingestion patterns, integration anti-patterns |
+| 17-BEHAVIOR-TEMPLATES.md | ✅ Complete | Dec 2024 | Added AI-driven scaffolding generation for any industry |
+
+---
+
+## Key Architectural Decisions
+
+### Core System Principles
+
+| Principle | Description | Reference |
+|-----------|-------------|-----------|
+| **Lag/Lead Focus** | System exists to connect behaviors to KPIs. Nothing else. | [01-PRODUCT-VISION](./01-PRODUCT-VISION.md#core-system-principles) |
+| **Industry Agnostic** | AI generates scaffolding for any business type | [01-PRODUCT-VISION](./01-PRODUCT-VISION.md#appendix-c-ai-driven-industry-scaffolding) |
+| **Integrations Ingest Only** | Integrations pull data in; never add features | [16-INTEGRATION-PHILOSOPHY](./16-INTEGRATION-PHILOSOPHY.md#1-core-principles) |
+| **Hide Complexity** | Simple UX powered by sophisticated backend | [01-PRODUCT-VISION](./01-PRODUCT-VISION.md#core-system-principles) |
+
+### AI Architecture
+
+| Feature | Description | Reference |
+|---------|-------------|-----------|
+| **DSPy-Style Prompts** | Declarative signatures, modular design | [09-AI-OPERATIONS](./09-AI-OPERATIONS.md#13-dspy-style-prompt-engineering) |
+| **Self-Reflection** | AI auto-corrects on validation failures | [09-AI-OPERATIONS](./09-AI-OPERATIONS.md#14-self-reflection--quality-assurance) |
+| **LLM-as-Judge** | Second LLM evaluates output quality | [09-AI-OPERATIONS](./09-AI-OPERATIONS.md#141-llm-as-judge-pattern) |
+| **Token Tracking** | Cost monitoring and budget limits | [09-AI-OPERATIONS](./09-AI-OPERATIONS.md#15-token-tracking--cost-management) |
+| **Self-Improvement** | System learns from feedback | [09-AI-OPERATIONS](./09-AI-OPERATIONS.md#16-ai-self-improvement-loop) |
+
+### Testing Architecture
+
+| Feature | Description | Reference |
+|---------|-------------|-----------|
+| **Agentic Testing** | AI agents simulate user journeys | [13-TESTING-STRATEGY](./13-TESTING-STRATEGY.md#10-agentic-testing-with-chrome-mcp) |
+| **Chrome MCP** | Browser automation via MCP | [13-TESTING-STRATEGY](./13-TESTING-STRATEGY.md#102-chrome-mcp-integration) |
+| **Persona Simulation** | Tests run as specific user personas | [13-TESTING-STRATEGY](./13-TESTING-STRATEGY.md#103-persona-based-test-scenarios) |
+| **LLM Error Analysis** | AI categorizes and triages failures | [13-TESTING-STRATEGY](./13-TESTING-STRATEGY.md#11-llm-as-judge-error-analysis) |
+
+### Analytics & Observability
+
+| Feature | Description | Reference |
+|---------|-------------|-----------|
+| **Provider Agnostic** | Swap MixPanel/PostHog without code changes | [15-ANALYTICS-LAYER](./15-ANALYTICS-LAYER.md#6-provider-abstraction) |
+| **Event Taxonomy** | Strict naming conventions | [15-ANALYTICS-LAYER](./15-ANALYTICS-LAYER.md#2-event-taxonomy) |
+| **Server Analytics** | AI operation tracking | [04-SYSTEM-ARCHITECTURE](./04-SYSTEM-ARCHITECTURE.md#144-analytics-abstraction-layer) |
 
 ---
 
@@ -148,6 +190,7 @@ System detects anomaly →   Flag for review        →    Alert manager
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | Dec 2024 | Initial | Full documentation suite created |
+| 1.1 | Dec 2024 | Engineer Update | Major expansion: Core principles, industry-agnostic philosophy, AI scaffolding, DSPy-style prompting, self-reflection patterns, LLM-as-judge, token tracking, agentic testing with Chrome MCP, analytics abstraction layer, integration philosophy. Added docs 15 (Analytics Layer) and 16 (Integration Philosophy). |
 
 ---
 
