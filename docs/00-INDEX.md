@@ -70,7 +70,7 @@ This documentation suite provides comprehensive specifications for the Topline s
 | 10-CORRELATION-ANALYSIS.md | ✅ Complete | Dec 2024 | - |
 | 11-REPORTING-ENGINE.md | ✅ Complete | Dec 2024 | - |
 | 12-IMPLEMENTATION-ROADMAP.md | ✅ Complete | Dec 2024 | - |
-| 13-TESTING-STRATEGY.md | ✅ Complete | Dec 2024 | Added agentic testing (Chrome MCP), LLM-as-judge error analysis, AI operations testing |
+| 13-TESTING-STRATEGY.md | ✅ Complete | Dec 2024 | **Major rewrite**: HTTP-first approach, multi-role scenario tests, test data generators, helper classes, 4-tier testing pyramid, agentic workflow loop |
 | 14-SECURITY-COMPLIANCE.md | ✅ Complete | Dec 2024 | - |
 | 15-ANALYTICS-LAYER.md | ✅ NEW | Dec 2024 | Event taxonomy, naming conventions, provider abstraction |
 | 16-INTEGRATION-PHILOSOPHY.md | ✅ NEW | Dec 2024 | Data ingestion patterns, integration anti-patterns |
@@ -103,10 +103,11 @@ This documentation suite provides comprehensive specifications for the Topline s
 
 | Feature | Description | Reference |
 |---------|-------------|-----------|
-| **Agentic Testing** | AI agents simulate user journeys | [13-TESTING-STRATEGY](./13-TESTING-STRATEGY.md#10-agentic-testing-with-chrome-mcp) |
-| **Chrome MCP** | Browser automation via MCP | [13-TESTING-STRATEGY](./13-TESTING-STRATEGY.md#102-chrome-mcp-integration) |
-| **Persona Simulation** | Tests run as specific user personas | [13-TESTING-STRATEGY](./13-TESTING-STRATEGY.md#103-persona-based-test-scenarios) |
-| **LLM Error Analysis** | AI categorizes and triages failures | [13-TESTING-STRATEGY](./13-TESTING-STRATEGY.md#11-llm-as-judge-error-analysis) |
+| **HTTP-First** | Test through API endpoints with real test DB | [13-TESTING-STRATEGY](./13-TESTING-STRATEGY.md#4-tier-2-http-scenario-tests) |
+| **Multi-Role Scenarios** | Test complete workflows across staff/manager/admin | [13-TESTING-STRATEGY](./13-TESTING-STRATEGY.md#8-multi-role-test-helpers) |
+| **Test Data Generators** | Generate realistic data with constraints | [13-TESTING-STRATEGY](./13-TESTING-STRATEGY.md#7-test-data-generators) |
+| **AI Testing** | Schema validation, quality assertions, real LLM tests | [13-TESTING-STRATEGY](./13-TESTING-STRATEGY.md#12-ai-operations-testing) |
+| **Agentic Workflow** | Build-Test-Review-Fix development loop | [13-TESTING-STRATEGY](./13-TESTING-STRATEGY.md#11-agentic-development-workflow) |
 
 ### Analytics & Observability
 

@@ -783,90 +783,129 @@ Before deploying any feature, verify:
 
 ## Testing Strategy
 
-### Philosophy: Test Business Logic, Not UI
+**Full testing documentation**: See `docs/13-TESTING-STRATEGY.md` for the comprehensive testing approach.
 
-For this MVP, testing focuses on code that can break user trust:
-- **Calculations** that show wrong numbers
-- **Data mutations** that lose or corrupt data
-- **Permissions** that leak sensitive information
-- **Edge cases** that crash the app
+### Philosophy: HTTP-First, Multi-Role Testing
 
-We do NOT extensively test:
-- UI component styling (Button variants, colors)
-- Layout and visual appearance
-- Mock/demo data accuracy
+Testing focuses on code that can break user trust through **HTTP scenario tests** with a real test database. This approach tests actual integration while remaining fast and reliable.
+
+**Key Principles:**
+- **HTTP-First** - Test through API endpoints, not mocks
+- **Real Database** - Use test database for integration tests
+- **Multi-Role** - Test complete workflows across staff/manager/admin
+- **AI as HTTP** - Test AI like any endpoint (input → output)
+
+### Testing Tiers
+
+| Tier | What | When to Run | Coverage |
+|------|------|-------------|----------|
+| **Tier 1** | Unit tests (calculations) | Every save | 70% |
+| **Tier 2** | HTTP scenario tests | Every commit | 25% |
+| **Tier 3** | Browser E2E | PR merge | 3% |
+| **Tier 4** | Real LLM tests | Nightly | 2% |
 
 ### What We Test
 
 | Priority | Category | Examples | Test Type |
 |----------|----------|----------|-----------|
 | **P0** | Calculations | Budget variance %, average check, margins | Unit |
-| **P0** | Auth flows | Login, token refresh, logout | Unit + E2E |
-| **P1** | Data mutations | Behavior verification, briefing completion | Unit |
+| **P0** | Multi-role flows | Staff logs → Manager verifies → Staff sees | HTTP Scenario |
+| **P0** | Auth/permissions | Role-based access, PIN lockout | HTTP Scenario |
+| **P1** | Data mutations | Behavior verification, briefing completion | HTTP Scenario |
 | **P1** | Edge cases | Division by zero, null handling, empty arrays | Unit |
-| **P2** | Critical user flows | Briefing flow, settings updates | E2E |
-| **P2** | Cache invalidation | Data freshness after mutations | Unit |
-
-### High-Risk Files to Test
-
-1. `hooks/queries/useBudget.ts` - Variance calculations
-2. `hooks/queries/useBriefing.ts` - Data assembly, attendance rates
-3. `lib/api-client.ts` - Auth flow, token handling
-4. `hooks/queries/useInsights.ts` - Metrics calculations
+| **P2** | Critical UI flows | Briefing wizard, behavior logging | E2E |
+| **P2** | AI quality | Schema validation, quality assertions | Unit + Real LLM |
 
 ### Test Structure
 
 ```
-__tests__/
-├── hooks/queries/     # Hook unit tests (business logic)
-├── mocks/             # MSW handlers for API mocking
-├── utils/             # Test utilities (wrapper, helpers)
-└── setup.ts           # Vitest setup with jest-dom
-
-e2e/
-├── fixtures.ts        # Auth mocking, test data
-├── briefing.spec.ts   # Briefing flow E2E
-├── budget.spec.ts     # Budget page E2E
-└── settings.spec.ts   # Settings page E2E
+tests/
+├── unit/              # Pure function tests (calculations)
+├── scenarios/         # HTTP scenario tests (multi-role flows)
+├── ai/                # AI schema and quality tests
+├── e2e/               # Playwright browser tests
+├── generators/        # Test data generators
+├── helpers/           # Role-based action helpers
+└── utils/             # Test client, database setup
 ```
 
 ### Running Tests
 
 ```bash
-npm run test           # Unit tests (watch mode)
-npm run test:run       # Unit tests (single run)
-npm run test:coverage  # Unit tests with coverage report
-npm run test:e2e       # Playwright E2E tests
-npm run test:e2e:ui    # Playwright with UI
+npm run test              # Unit + scenario tests
+npm run test:unit         # Unit tests only
+npm run test:scenarios    # HTTP scenario tests only
+npm run test:coverage     # With coverage report
+npm run test:e2e          # Playwright E2E tests
+npm run test:ai:real      # Real LLM tests (nightly)
 ```
 
-### Writing New Tests
+### Multi-Role Test Example
 
-**For hooks (business logic):**
-```tsx
-describe('useBudget', () => {
-  it('calculates variance correctly', async () => {
-    const { result } = renderHook(() => useBudget(), { wrapper });
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.summary.variancePercent).toBeCloseTo(-4.7, 1);
+```typescript
+// tests/scenarios/behavior-verification.test.ts
+describe('Behavior Verification Flow', () => {
+  it('staff logs → manager verifies → staff sees verified', async () => {
+    // Staff logs behavior
+    const log = await staffClient.post('/api/behavior-logs', {
+      behaviorId: behaviors[0].id
+    }, { token: staffToken });
+    expect(log.body.status).toBe('pending');
+
+    // Manager sees it pending
+    const pending = await managerClient.get('/api/behavior-logs/pending', {
+      token: managerToken
+    });
+    expect(pending.body.logs).toContainEqual(
+      expect.objectContaining({ id: log.body.id })
+    );
+
+    // Manager verifies
+    await managerClient.patch(`/api/behavior-logs/${log.body.id}/verify`, {
+      status: 'verified'
+    }, { token: managerToken });
+
+    // Staff sees it verified
+    const myLogs = await staffClient.get('/api/behavior-logs/mine', {
+      token: staffToken
+    });
+    expect(myLogs.body.logs[0].status).toBe('verified');
   });
 });
 ```
 
-**For E2E (critical flows):**
-```tsx
-test('manager completes daily briefing', async ({ page }) => {
-  await page.goto('/manager/briefing');
-  await page.getByRole('tab', { name: /attendance/i }).click();
-  await page.getByRole('button', { name: /complete/i }).click();
-  await expect(page.getByText(/complete/i)).toBeVisible();
-});
+### Test Helpers
+
+Use helper classes for readable multi-role tests:
+
+```typescript
+// In test file
+const staff = createStaffActions(client, staffToken);
+const manager = createManagerActions(client, managerToken);
+
+// Clean, readable tests
+const logs = await staff.logBehaviors([...]);
+await manager.verifyAll(logs.map(l => l.id));
+const dashboard = await staff.getDashboard();
+expect(dashboard.behaviorsVerified).toBe(3);
 ```
 
 ### What NOT to Test
 
-- Component styling (`Button variant="primary"` renders blue)
+- Component styling (use visual regression tools separately)
 - CSS class application
-- Icon rendering
-- Animation timing
-- Mock data values (they're placeholders)
+- Mock data values
+- Every CRUD permutation (HTTP scenarios cover this)
+
+### Feature Completion Checklist
+
+Before marking any feature complete:
+
+```markdown
+- [ ] Unit tests for pure functions (calculations)
+- [ ] HTTP scenario tests for the feature flow
+- [ ] Multi-role tests if feature involves role interactions
+- [ ] Edge case tests (empty input, invalid data)
+- [ ] `npm run test` passes
+- [ ] Coverage meets threshold
+```
