@@ -51,6 +51,7 @@ This documentation suite provides comprehensive specifications for the Topline s
 | [15-ANALYTICS-LAYER.md](./15-ANALYTICS-LAYER.md) | Event tracking, analytics abstraction | Engineering, Product |
 | [16-INTEGRATION-PHILOSOPHY.md](./16-INTEGRATION-PHILOSOPHY.md) | Data ingestion strategy, integration patterns | Engineering |
 | [17-BEHAVIOR-TEMPLATES.md](./17-BEHAVIOR-TEMPLATES.md) | Role-specific behavior libraries, AI scaffolding | Product, Support |
+| [18-PRODUCTION-CONCERNS.md](./18-PRODUCTION-CONCERNS.md) | Deferred items for production (rate limiting, caching, monitoring) | Engineering |
 
 ---
 

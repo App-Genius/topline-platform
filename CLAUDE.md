@@ -39,6 +39,81 @@ Before implementing any feature, consult the relevant documentation:
 
 ---
 
+## Specialized Agents
+
+Project-specific agents are defined in `.claude/agents/`. Use them to ensure thoroughness:
+
+| Agent | When to Use | Purpose |
+|-------|-------------|---------|
+| `feature-implementer` | Implementing any feature | Ensures complete implementation with all tests |
+| `test-writer` | After implementing, or when coverage is low | Writes comprehensive tests with edge cases |
+| `code-reviewer` | Before marking anything complete | Reviews for quality, security, architecture |
+| `test-fixer` | When tests fail | Debugs and fixes test failures properly |
+| `completion-checker` | Before claiming feature is done | Final gate - verifies nothing is left undone |
+| `schema-migrator` | Any database schema change | Handles Prisma migrations safely |
+
+### Agent Workflow
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                        AGENT-ASSISTED DEVELOPMENT                             │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  ┌─────────────────────┐     ┌─────────────────────┐                         │
+│  │ feature-implementer │     │  schema-migrator    │ ◄─ If DB changes needed │
+│  └──────────┬──────────┘     └──────────┬──────────┘                         │
+│             │                           │                                     │
+│             └─────────┬─────────────────┘                                     │
+│                       ▼                                                       │
+│            ┌─────────────────────┐                                           │
+│            │    test-writer      │ ── Ensures comprehensive test coverage    │
+│            └──────────┬──────────┘                                           │
+│                       │                                                       │
+│                       ▼                                                       │
+│            ┌─────────────────────┐                                           │
+│            │   code-reviewer     │ ── Reviews for quality and security       │
+│            └──────────┬──────────┘                                           │
+│                       │                                                       │
+│                  ┌────┴────┐                                                 │
+│                  │ Issues? │                                                 │
+│                  └────┬────┘                                                 │
+│                       │                                                       │
+│              YES ◄────┴────► NO                                              │
+│               │              │                                               │
+│               ▼              ▼                                               │
+│         ┌──────────┐  ┌─────────────────────┐                               │
+│         │test-fixer│  │ completion-checker  │ ── Final verification         │
+│         └────┬─────┘  └──────────┬──────────┘                               │
+│              │                   │                                           │
+│              └───────► LOOP ◄────┴───────────► COMPLETE                     │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### How to Invoke Agents
+
+Agents are invoked automatically when:
+1. Task matches the agent's description
+2. You explicitly request: "Use the code-reviewer agent"
+3. The workflow requires specialized handling
+
+**Example**:
+```
+> Implement the bulk verification feature from the roadmap
+[Claude uses feature-implementer agent automatically]
+
+> Review my changes
+[Claude uses code-reviewer agent]
+
+> Tests are failing, fix them
+[Claude uses test-fixer agent]
+
+> Is this feature complete?
+[Claude uses completion-checker agent]
+```
+
+---
+
 ## Agentic Development Workflow
 
 ### The Build-Test-Review-Fix Loop
@@ -375,6 +450,49 @@ it('staff creates, manager approves, staff sees result', async () => {
 
 ---
 
+## Critical Rules (NEVER Violate)
+
+These rules exist because of past issues. Breaking them leads to incomplete work:
+
+### NEVER Do These Things
+
+1. **Never claim a feature is complete without running tests**
+   - Run `npm run test` and verify it passes
+   - Run `npm run test:coverage` and verify coverage meets threshold
+
+2. **Never skip writing tests**
+   - Every feature needs unit tests for logic
+   - Every feature needs HTTP scenario tests for flow
+   - Multi-role features need multi-role tests
+
+3. **Never leave TODO/FIXME comments without tracking**
+   - If you write a TODO, create a task for it
+   - Don't leave loose ends
+
+4. **Never guess at requirements**
+   - Read the docs in `docs/`
+   - Check existing patterns in the codebase
+   - Ask for clarification if unclear
+
+5. **Never skip edge cases**
+   - Test zero values, empty inputs, null
+   - Test permission failures
+   - Test cross-organization isolation
+
+6. **Never mark complete without using completion-checker**
+   - The `completion-checker` agent is the final gate
+   - It verifies ALL requirements are met
+
+### ALWAYS Do These Things
+
+1. **Always read relevant docs before implementing**
+2. **Always write tests alongside implementation**
+3. **Always verify tests pass before claiming completion**
+4. **Always use the specialized agents for their purposes**
+5. **Always handle loading, error, and empty states in UI**
+
+---
+
 ## Summary
 
 **The golden rule**: Every feature needs tests. The loop is:
@@ -382,6 +500,13 @@ it('staff creates, manager approves, staff sees result', async () => {
 ```
 Understand → Implement → Test → Fix (if needed) → Verify → Complete
 ```
+
+**Use the specialized agents**:
+- `feature-implementer` - For building features
+- `test-writer` - For comprehensive tests
+- `code-reviewer` - For quality review
+- `test-fixer` - For debugging failures
+- `completion-checker` - For final verification
 
 Tests ensure the system works as specified. Multi-role tests ensure workflows work across user types. AI tests ensure structured output. Coverage ensures thoroughness.
 
