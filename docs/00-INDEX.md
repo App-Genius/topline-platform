@@ -52,6 +52,7 @@ This documentation suite provides comprehensive specifications for the Topline s
 | [16-INTEGRATION-PHILOSOPHY.md](./16-INTEGRATION-PHILOSOPHY.md) | Data ingestion strategy, integration patterns | Engineering |
 | [17-BEHAVIOR-TEMPLATES.md](./17-BEHAVIOR-TEMPLATES.md) | Role-specific behavior libraries, AI scaffolding | Product, Support |
 | [18-PRODUCTION-CONCERNS.md](./18-PRODUCTION-CONCERNS.md) | Deferred items for production (rate limiting, caching, monitoring) | Engineering |
+| [19-TRAINING-SYSTEM.md](./19-TRAINING-SYSTEM.md) | Guided walkthrough training system architecture | Engineering, Product |
 
 ---
 
@@ -76,6 +77,8 @@ This documentation suite provides comprehensive specifications for the Topline s
 | 15-ANALYTICS-LAYER.md | ✅ NEW | Dec 2024 | Event taxonomy, naming conventions, provider abstraction |
 | 16-INTEGRATION-PHILOSOPHY.md | ✅ NEW | Dec 2024 | Data ingestion patterns, integration anti-patterns |
 | 17-BEHAVIOR-TEMPLATES.md | ✅ Complete | Dec 2024 | Added AI-driven scaffolding generation for any industry |
+| 18-PRODUCTION-CONCERNS.md | ✅ Complete | Dec 2024 | - |
+| 19-TRAINING-SYSTEM.md | ✅ NEW | Dec 2024 | Guided walkthrough architecture, flow-documenter agent, multi-role training |
 
 ---
 

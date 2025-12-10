@@ -1,38 +1,240 @@
-# Production Concerns (Deferred from MVP)
+# Production Concerns
 
-This document tracks technical concerns that are deferred from the MVP phase but must be addressed before full production launch.
+This document tracks technical requirements for deploying Topline to a live environment.
 
-## Status: Deferred
+**Deployment Context:** Multi-million dollar hotel, 200 employees, financial data management, live changes during operation.
 
-These items are intentionally out of scope for MVP. They should be implemented when preparing for production scale.
+---
+
+## MVP Requirements (Pre-Launch)
+
+These items are **required before going live**. They protect against data loss, security issues, and deployment failures.
+
+### 1. Rate Limiting
+
+**Why Required for MVP:** Prevents a buggy client or accidental loop from overwhelming the API during service hours.
+
+**Implementation:**
+```typescript
+// apps/api/src/middleware/rate-limit.ts
+import { rateLimiter } from 'hono-rate-limiter'
+
+// General API rate limit
+export const apiRateLimit = rateLimiter({
+  windowMs: 60 * 1000, // 1 minute
+  max: 100, // 100 requests per minute per user
+  keyGenerator: (c) => c.get('userId') || c.req.header('x-forwarded-for') || 'anonymous'
+})
+
+// Stricter limit for auth endpoints
+export const authRateLimit = rateLimiter({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 attempts per 15 minutes
+  keyGenerator: (c) => c.req.header('x-forwarded-for') || 'anonymous'
+})
+```
+
+**Apply to routes:**
+```typescript
+// apps/api/src/index.ts
+app.use('/api/*', apiRateLimit)
+app.use('/api/auth/login', authRateLimit)
+app.use('/api/auth/pin', authRateLimit)
+```
+
+**Effort:** 1-2 hours
+
+---
+
+### 2. PIN Hashing
+
+**Why Required for MVP:** 4-digit PINs have only 10,000 combinations. Plain text storage allows brute-force guessing. System manages financial data.
+
+**Current State:** PIN stored as plain text string in database.
+
+**Implementation:**
+```typescript
+// packages/shared/src/utils/pin.ts
+import bcrypt from 'bcryptjs'
+
+const PIN_SALT_ROUNDS = 10
+
+export async function hashPin(pin: string): Promise<string> {
+  return bcrypt.hash(pin, PIN_SALT_ROUNDS)
+}
+
+export async function verifyPin(pin: string, hashedPin: string): Promise<boolean> {
+  return bcrypt.compare(pin, hashedPin)
+}
+```
+
+**Database Migration:**
+```sql
+-- Migration: hash_existing_pins
+-- Run ONCE after deploying new code
+
+-- Note: This requires application-level migration
+-- because bcrypt hashing must happen in Node.js
+```
+
+**Migration Script:**
+```typescript
+// scripts/migrate-pins.ts
+import { prisma } from '@topline/db'
+import { hashPin } from '@topline/shared'
+
+async function migratePins() {
+  const users = await prisma.user.findMany({
+    where: { pin: { not: null } }
+  })
+
+  for (const user of users) {
+    if (user.pin && user.pin.length === 4) { // Unhashed PIN
+      const hashed = await hashPin(user.pin)
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { pin: hashed }
+      })
+    }
+  }
+
+  console.log(`Migrated ${users.length} PINs`)
+}
+```
+
+**Effort:** 1-2 hours
+
+---
+
+### 3. Database Migrations
+
+**Why Required for MVP:** Without migration files, you cannot safely rollback a bad schema change. Live changes require rollback capability.
+
+**Current State:** Using `prisma db push` (no migration history).
+
+**Setup:**
+```bash
+# Initialize migrations from current schema
+npx prisma migrate dev --name init
+
+# This creates:
+# - prisma/migrations/[timestamp]_init/migration.sql
+# - Migration history in database
+```
+
+**Workflow After Setup:**
+```bash
+# For schema changes during development
+npx prisma migrate dev --name add_feature_x
+
+# For production deployment
+npx prisma migrate deploy
+```
+
+**Rollback Capability:**
+```bash
+# If deployment fails, rollback to previous migration
+npx prisma migrate resolve --rolled-back [migration_name]
+```
+
+**Add to package.json:**
+```json
+{
+  "scripts": {
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:status": "prisma migrate status"
+  }
+}
+```
+
+**Effort:** 1 hour
+
+---
+
+### 4. Health Endpoint
+
+**Why Required for MVP:** After deployment, you need to verify the system is working. Health checks enable automated monitoring and deployment verification.
+
+**Implementation:**
+```typescript
+// apps/api/src/routes/health.ts
+import { Hono } from 'hono'
+import { prisma } from '@topline/db'
+
+const health = new Hono()
+
+// Basic health check (for load balancers)
+health.get('/', (c) => {
+  return c.json({ status: 'ok', timestamp: new Date().toISOString() })
+})
+
+// Deep health check (verifies database)
+health.get('/ready', async (c) => {
+  try {
+    // Verify database connection
+    await prisma.$queryRaw`SELECT 1`
+
+    return c.json({
+      status: 'ready',
+      timestamp: new Date().toISOString(),
+      checks: {
+        database: 'connected'
+      }
+    })
+  } catch (error) {
+    return c.json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      checks: {
+        database: 'disconnected'
+      }
+    }, 503)
+  }
+})
+
+export default health
+```
+
+**Register route:**
+```typescript
+// apps/api/src/index.ts
+import health from './routes/health'
+
+app.route('/health', health)
+```
+
+**Usage:**
+- `/health` - Quick check for load balancers (no DB query)
+- `/health/ready` - Full check including database connectivity
+
+**Effort:** 30 minutes
+
+---
+
+### MVP Pre-Launch Checklist
+
+Before deploying to the hotel:
+
+- [ ] Rate limiting configured on all API routes
+- [ ] Auth endpoints have stricter rate limits (5 attempts/15min)
+- [ ] All PINs hashed with bcrypt
+- [ ] PIN migration script run on production data
+- [ ] Database migrations initialized (`prisma migrate dev --name init`)
+- [ ] Health endpoint responding at `/health` and `/health/ready`
+- [ ] Deployment tested: deploy → check `/health/ready` → verify
+
+---
+
+## Post-MVP Items
+
+These items are deferred from MVP but should be addressed as the system scales.
 
 ---
 
 ## 1. Performance & Scalability
 
-### 1.1 Rate Limiting
-
-**Why Needed:** Prevent API abuse, protect against DDoS, ensure fair usage.
-
-**Implementation:**
-```typescript
-// Example: Use Hono middleware with Redis
-import { rateLimiter } from 'hono-rate-limiter'
-
-app.use('/api/*', rateLimiter({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 100 requests per window
-  keyGenerator: (c) => c.req.header('x-forwarded-for') || c.req.ip
-}))
-```
-
-**Endpoints to Rate Limit:**
-- Login endpoints (stricter: 5 attempts/15min)
-- AI endpoints (cost control)
-- Data export endpoints
-- Webhook endpoints
-
-### 1.2 Caching Strategy
+### 1.1 Caching Strategy
 
 **Why Needed:** Reduce database load, improve response times.
 
@@ -49,7 +251,7 @@ app.use('/api/*', rateLimiter({
 | Leaderboard | 30 sec | On behavior log |
 | Dashboard aggregations | 1 min | On daily entry |
 
-### 1.3 Database Optimization
+### 1.2 Database Optimization
 
 **Tasks:**
 - [ ] Add read replicas for reporting queries
@@ -58,7 +260,7 @@ app.use('/api/*', rateLimiter({
 - [ ] Review and optimize slow queries
 - [ ] Add database monitoring (query performance)
 
-### 1.4 Load Testing
+### 1.3 Load Testing
 
 **Tools:** k6, Artillery, or Locust
 

@@ -49,6 +49,7 @@ Project-specific agents are defined in `.claude/agents/`. Use them to ensure tho
 | `test-writer` | After implementing, or when coverage is low | Writes comprehensive tests with edge cases |
 | `code-reviewer` | Before marking anything complete | Reviews for quality, security, architecture |
 | `test-fixer` | When tests fail | Debugs and fixes test failures properly |
+| `flow-documenter` | After implementing user-facing features | Generates training flow documentation |
 | `completion-checker` | Before claiming feature is done | Final gate - verifies nothing is left undone |
 | `schema-migrator` | Any database schema change | Handles Prisma migrations safely |
 
@@ -72,6 +73,11 @@ Project-specific agents are defined in `.claude/agents/`. Use them to ensure tho
 │                       ▼                                                       │
 │            ┌─────────────────────┐                                           │
 │            │   code-reviewer     │ ── Reviews for quality and security       │
+│            └──────────┬──────────┘                                           │
+│                       │                                                       │
+│                       ▼                                                       │
+│            ┌─────────────────────┐                                           │
+│            │  flow-documenter    │ ── Documents user flows for training      │
 │            └──────────┬──────────┘                                           │
 │                       │                                                       │
 │                  ┌────┴────┐                                                 │
