@@ -54,6 +54,13 @@ This documentation suite provides comprehensive specifications for the Topline s
 | [18-PRODUCTION-CONCERNS.md](./18-PRODUCTION-CONCERNS.md) | Deferred items for production (rate limiting, caching, monitoring) | Engineering |
 | [19-TRAINING-SYSTEM.md](./19-TRAINING-SYSTEM.md) | Guided walkthrough training system architecture | Engineering, Product |
 
+### Implementation Phases
+
+| Document | Purpose | Audience |
+|----------|---------|----------|
+| [20-PHASE-1-HOTEL-MVP.md](./20-PHASE-1-HOTEL-MVP.md) | Phase 1: Hotel MVP for AC Hotel (hard-coded roles, behaviors) | Engineering, Product |
+| [21-PHASE-2-GENERIC-PLATFORM.md](./21-PHASE-2-GENERIC-PLATFORM.md) | Phase 2: Generic platform (dynamic, multi-industry, integrations) | Engineering, Product |
+
 ---
 
 ## Document Status
@@ -79,6 +86,8 @@ This documentation suite provides comprehensive specifications for the Topline s
 | 17-BEHAVIOR-TEMPLATES.md | ✅ Complete | Dec 2024 | Added AI-driven scaffolding generation for any industry |
 | 18-PRODUCTION-CONCERNS.md | ✅ Complete | Dec 2024 | - |
 | 19-TRAINING-SYSTEM.md | ✅ NEW | Dec 2024 | Guided walkthrough architecture, flow-documenter agent, multi-role training |
+| 20-PHASE-1-HOTEL-MVP.md | ✅ NEW | Dec 2024 | Hotel MVP spec: hard-coded roles, behaviors, briefing system, game state, AI recommendations |
+| 21-PHASE-2-GENERIC-PLATFORM.md | ✅ NEW | Dec 2024 | Generic platform spec: multi-industry, questionnaire, dynamic config, integrations |
 
 ---
 
@@ -196,6 +205,7 @@ System detects anomaly →   Flag for review        →    Alert manager
 |---------|------|--------|---------|
 | 1.0 | Dec 2024 | Initial | Full documentation suite created |
 | 1.1 | Dec 2024 | Engineer Update | Major expansion: Core principles, industry-agnostic philosophy, AI scaffolding, DSPy-style prompting, self-reflection patterns, LLM-as-judge, token tracking, agentic testing with Chrome MCP, analytics abstraction layer, integration philosophy. Added docs 15 (Analytics Layer) and 16 (Integration Philosophy). |
+| 1.2 | Dec 2024 | Phase Planning | Added phased implementation docs: 20-PHASE-1-HOTEL-MVP.md (AC Hotel MVP with hard-coded roles, behaviors, briefing system, game state, AI recommendations via OpenRouter) and 21-PHASE-2-GENERIC-PLATFORM.md (multi-industry support, onboarding questionnaire, dynamic configuration, integrations). |
 
 ---
 
