@@ -1,9 +1,16 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { useAuth } from "@/context/AuthContext";
+import {
+  getUsers,
+  getUser,
+  getUserStats,
+  createUser,
+  updateUser,
+  deactivateUser,
+} from "@/actions/users";
 
 // Types
 interface User {
@@ -13,7 +20,7 @@ interface User {
   avatar: string | null;
   isActive: boolean;
   roleId: string;
-  role: { id: string; name: string };
+  role: { id: string; name: string; type: string };
   createdAt: Date;
 }
 
@@ -54,25 +61,20 @@ interface UserStats {
 
 /**
  * Hook for fetching users list
- *
- * Features:
- * - Automatic auth check
- * - Type-safe parameters
- * - AbortSignal for request cancellation
- * - Proper cache key structure
  */
 export function useUsers(params?: UserListParams) {
   const { isAuthenticated } = useAuth();
 
   return useQuery({
-    queryKey: queryKeys.users.list(params),
-    queryFn: async ({ signal }) => {
-      const response = await api.users.list({
+    queryKey: queryKeys.users.list(params as Record<string, unknown>),
+    queryFn: async () => {
+      const result = await getUsers({
         page: params?.page ?? 1,
         limit: params?.limit ?? 50,
         ...params,
       });
-      return response;
+      if (!result.success) throw new Error(result.error);
+      return result.data;
     },
     enabled: isAuthenticated,
     staleTime: 60 * 1000, // 1 minute
@@ -88,7 +90,9 @@ export function useUser(id: string) {
   return useQuery({
     queryKey: queryKeys.users.detail(id),
     queryFn: async () => {
-      return api.users.get(id);
+      const result = await getUser(id);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
     },
     enabled: isAuthenticated && !!id,
   });
@@ -103,7 +107,9 @@ export function useUserStats(userId: string, days = 30) {
   return useQuery({
     queryKey: queryKeys.users.stats(userId, days),
     queryFn: async () => {
-      return api.users.getStats(userId, days) as Promise<UserStats>;
+      const result = await getUserStats(userId, days);
+      if (!result.success) throw new Error(result.error);
+      return result.data as UserStats;
     },
     enabled: isAuthenticated && !!userId,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -112,30 +118,25 @@ export function useUserStats(userId: string, days = 30) {
 
 /**
  * Hook for creating a new user
- *
- * Features:
- * - Automatic cache invalidation on success
- * - Type-safe mutation data
- * - Error handling via error state
  */
 export function useCreateUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (data: CreateUserInput) => {
-      return api.users.create({
+      const result = await createUser({
         email: data.email,
         name: data.name,
         roleId: data.roleId,
         password: data.pin || "temp123!",
       });
+      if (!result.success) throw new Error(result.error);
+      return result.data;
     },
     onSuccess: () => {
-      // Invalidate all user queries to refetch fresh data
       queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
     },
     onError: (error) => {
-      // Error is accessible via mutation.error
       console.error("[useCreateUser] Error:", error);
     },
   });
@@ -149,10 +150,11 @@ export function useUpdateUser() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateUserInput }) => {
-      return api.users.update(id, data);
+      const result = await updateUser(id, data);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
     },
     onSuccess: (_, { id }) => {
-      // Invalidate specific user and list
       queryClient.invalidateQueries({ queryKey: queryKeys.users.detail(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.users.lists() });
     },
@@ -167,10 +169,11 @@ export function useDeactivateUser() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      return api.users.deactivate(id);
+      const result = await deactivateUser(id);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
     },
     onSuccess: () => {
-      // Invalidate all user queries
       queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
     },
   });
@@ -181,7 +184,6 @@ export function useDeactivateUser() {
  */
 export function getUserMutationError(error: unknown): string | null {
   if (!error) return null;
-  if (error instanceof ApiError) return error.message;
   if (error instanceof Error) return error.message;
   return "An unexpected error occurred";
 }

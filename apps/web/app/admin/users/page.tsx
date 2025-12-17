@@ -4,11 +4,11 @@ import { useState, FormEvent, useMemo } from "react";
 import { Users, UserPlus, Edit2, Trash2 } from "lucide-react";
 import {
   useUsers,
-  useRoles,
   useCreateUser,
   useUpdateUser,
   useDeactivateUser,
-} from "@/hooks/useApi";
+} from "@/hooks/queries/useUsers";
+import { useRoles } from "@/hooks/queries/useRoles";
 import {
   Modal,
   Button,
@@ -55,9 +55,14 @@ export default function UsersPage() {
   const { data: rolesData } = useRoles();
 
   // Mutation hooks
-  const { createUser, isLoading: isCreating, error: createError } = useCreateUser();
-  const { updateUser, isLoading: isUpdating, error: updateError } = useUpdateUser();
-  const { deactivateUser, isLoading: isDeactivating } = useDeactivateUser();
+  const createMutation = useCreateUser();
+  const updateMutation = useUpdateUser();
+  const deactivateMutation = useDeactivateUser();
+  const isCreating = createMutation.isPending;
+  const isUpdating = updateMutation.isPending;
+  const isDeactivating = deactivateMutation.isPending;
+  const createError = createMutation.error;
+  const updateError = updateMutation.error;
 
   // Local state
   const [search, setSearch] = useState("");
@@ -160,13 +165,16 @@ export default function UsersPage() {
 
     try {
       if (editingUser) {
-        await updateUser(editingUser.id, {
-          email: formData.email,
-          name: formData.name,
-          roleId: formData.roleId,
+        await updateMutation.mutateAsync({
+          id: editingUser.id,
+          data: {
+            email: formData.email,
+            name: formData.name,
+            roleId: formData.roleId,
+          },
         });
       } else {
-        await createUser({
+        await createMutation.mutateAsync({
           email: formData.email,
           name: formData.name,
           roleId: formData.roleId,
@@ -185,7 +193,7 @@ export default function UsersPage() {
     if (!deleteUserId) return;
 
     try {
-      await deactivateUser(deleteUserId);
+      await deactivateMutation.mutateAsync(deleteUserId);
       setDeleteUserId(null);
       refetchUsers();
     } catch (err) {
@@ -292,7 +300,7 @@ export default function UsersPage() {
       {(usersError || pageError) && (
         <div className="mb-6">
           <ErrorAlert
-            message={usersError || pageError || "An error occurred"}
+            message={usersError?.message || pageError || "An error occurred"}
             onDismiss={() => setPageError(null)}
           />
         </div>
@@ -354,7 +362,7 @@ export default function UsersPage() {
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           {formError && (
-            <ErrorAlert message={formError} />
+            <ErrorAlert message={formError.message} />
           )}
 
           <FormField

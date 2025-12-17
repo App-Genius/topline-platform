@@ -1,17 +1,23 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { queryOptions } from "@/lib/query-client";
 import { useAuth } from "@/context/AuthContext";
+import {
+  getRoles,
+  getRole,
+  createRole,
+  updateRole,
+  deleteRole,
+} from "@/actions/roles";
 
 // Types
 interface Role {
   id: string;
   name: string;
   type: string;
-  permissions: string[];
+  permissions: unknown;
   organizationId: string;
   createdAt: Date;
 }
@@ -29,29 +35,28 @@ interface CreateRoleInput {
 
 interface UpdateRoleInput {
   name?: string;
-  description?: string;
+  type?: string;
   permissions?: string[];
 }
 
 /**
  * Hook for fetching roles list
- *
- * Roles are relatively static, so we use longer stale times
  */
 export function useRoles(params?: RoleListParams) {
   const { isAuthenticated } = useAuth();
 
   return useQuery({
-    queryKey: queryKeys.roles.list(params),
+    queryKey: queryKeys.roles.list(params as Record<string, unknown>),
     queryFn: async () => {
-      return api.roles.list({
+      const result = await getRoles({
         page: params?.page ?? 1,
         limit: params?.limit ?? 100,
-        ...params,
       });
+      if (!result.success) throw new Error(result.error);
+      return result.data;
     },
     enabled: isAuthenticated,
-    ...queryOptions.static, // Roles rarely change
+    ...queryOptions.static,
   });
 }
 
@@ -64,7 +69,9 @@ export function useRole(id: string) {
   return useQuery({
     queryKey: queryKeys.roles.detail(id),
     queryFn: async () => {
-      return api.roles.get(id);
+      const result = await getRole(id);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
     },
     enabled: isAuthenticated && !!id,
     ...queryOptions.static,
@@ -79,22 +86,13 @@ export function useCreateRole() {
 
   return useMutation({
     mutationFn: async (data: CreateRoleInput) => {
-      return api.roles.create({
+      const result = await createRole({
         name: data.name,
+        type: data.type || "CUSTOM",
         permissions: data.permissions,
-        type: (data.type || "CUSTOM") as
-          | "ADMIN"
-          | "MANAGER"
-          | "SERVER"
-          | "HOST"
-          | "BARTENDER"
-          | "BUSSER"
-          | "PURCHASER"
-          | "CHEF"
-          | "ACCOUNTANT"
-          | "FACILITIES"
-          | "CUSTOM",
       });
+      if (!result.success) throw new Error(result.error);
+      return result.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.roles.all });
@@ -110,7 +108,9 @@ export function useUpdateRole() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateRoleInput }) => {
-      return api.roles.update(id, data);
+      const result = await updateRole(id, data);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
     },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.roles.detail(id) });
@@ -127,11 +127,12 @@ export function useDeleteRole() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      return api.roles.delete(id);
+      const result = await deleteRole(id);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.roles.all });
-      // Also invalidate users since they reference roles
       queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
     },
   });
@@ -142,7 +143,6 @@ export function useDeleteRole() {
  */
 export function getRoleMutationError(error: unknown): string | null {
   if (!error) return null;
-  if (error instanceof ApiError) return error.message;
   if (error instanceof Error) return error.message;
   return "An unexpected error occurred";
 }

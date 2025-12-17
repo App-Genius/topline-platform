@@ -264,7 +264,7 @@ export function DataTable<T extends object>({
               return (
                 <tr
                   key={key ?? rowIndex}
-                  ref={(el) => (rowRefs.current[rowIndex] = el)}
+                  ref={(el) => { rowRefs.current[rowIndex] = el; }}
                   role="row"
                   aria-rowindex={rowIndex + 2}
                   aria-selected={isSelected || undefined}

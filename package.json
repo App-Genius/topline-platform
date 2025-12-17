@@ -2,23 +2,22 @@
   "name": "topline",
   "version": "0.1.0",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
-    "dev": "turbo dev",
-    "build": "turbo build",
-    "lint": "turbo lint",
-    "test": "vitest",
-    "test:watch": "vitest --watch",
-    "db:generate": "turbo db:generate",
-    "db:push": "turbo db:push",
-    "db:seed": "turbo db:seed"
+    "dev": "npm run dev --prefix apps/web",
+    "build": "npm run build --prefix apps/web",
+    "start": "npm run start --prefix apps/web",
+    "lint": "npm run lint --prefix apps/web",
+    "test": "npm run test --prefix apps/web",
+    "test:run": "npm run test:run --prefix apps/web",
+    "test:coverage": "npm run test:coverage --prefix apps/web",
+    "test:e2e": "npm run test:e2e --prefix apps/web",
+    "db:generate": "npm run db:generate --prefix apps/web",
+    "db:push": "npm run db:push --prefix apps/web",
+    "db:migrate": "npm run db:migrate --prefix apps/web",
+    "db:seed": "npm run db:seed --prefix apps/web",
+    "db:studio": "npm run db:studio --prefix apps/web"
   },
   "devDependencies": {
-    "turbo": "^2.3.3",
-    "vitest": "^2.1.6",
     "@vitest/coverage-v8": "^2.1.6"
   },
   "packageManager": "npm@10.8.0",

@@ -18,7 +18,7 @@ You are a senior engineer implementing features for Topline - a behavior-driven 
 ### 1. Read ALL Relevant Documentation
 You MUST read these files before writing any code:
 - `docs/12-IMPLEMENTATION-ROADMAP.md` - Find the feature in the roadmap
-- `docs/06-API-SPECIFICATION.md` - Understand required endpoints (Hono + OpenAPI)
+- `docs/06-API-SPECIFICATION.md` - Understand required endpoints
 - `docs/05-DATABASE-SCHEMA.md` - Understand Prisma data model
 - `docs/08-CALCULATION-ENGINE.md` - If feature involves calculations
 - `docs/13-TESTING-STRATEGY.md` - HTTP-first testing requirements
@@ -30,56 +30,75 @@ You MUST read these files before writing any code:
 ### 2. Create a Detailed Implementation Plan
 Before writing code, you MUST:
 - [ ] List ALL files that will be created or modified
-- [ ] List ALL API endpoints needed (follow Hono OpenAPI pattern)
+- [ ] List ALL Server Actions needed
 - [ ] List ALL Prisma queries/mutations needed
 - [ ] List ALL edge cases to handle
 - [ ] List ALL tests that will be written
 
 ### 3. Check Existing Patterns
 
-**API Routes** (apps/api/src/routes/):
-- [ ] Reference `behaviors.ts` for CRUD endpoint patterns
+**Server Actions** (apps/web/actions/):
+- [ ] Reference `behaviors.ts` for CRUD action patterns
 - [ ] Reference `auth.ts` for authentication patterns
-- [ ] Note: Tests are co-located (`*.test.ts` next to source)
+- [ ] Note: All actions return `ActionResult<T>` for consistent error handling
 
 **React Query Hooks** (apps/web/hooks/queries/):
 - [ ] Reference `useBehaviors.ts` for query/mutation patterns
 - [ ] Use `queryKeys` factory from `lib/query-keys.ts`
-- [ ] Use `api` client from `lib/api-client.ts`
+- [ ] Hooks call Server Actions (not HTTP endpoints)
 
-**Shared Packages**:
-- [ ] `packages/db` - Prisma client and schema
-- [ ] `packages/shared` - Zod schemas, types, utilities
+**Shared Code**:
+- [ ] `lib/db.ts` - Prisma client
+- [ ] `lib/schemas/` - Zod schemas
+- [ ] `lib/auth/session.ts` - Authentication utilities
 
 ## Implementation Checklist
 
 For EVERY feature, you must complete ALL of these:
 
-### Code Implementation - Backend (apps/api/)
-- [ ] API route created in `apps/api/src/routes/` using Hono OpenAPI
-- [ ] Zod schemas defined for request/response validation
+### Code Implementation - Server Actions (apps/web/actions/)
+- [ ] Server Action created in `actions/` with `'use server'` directive
+- [ ] Zod schemas defined for input validation
 - [ ] Prisma queries use proper includes and selects
 - [ ] organizationId scoping enforced (multi-tenancy)
-- [ ] Error handling returns proper HTTP status codes
+- [ ] Error handling returns proper ActionResult
 - [ ] TypeScript types are correct (no `any`)
+- [ ] Auth checks use `requireAuth()` or `requireRole()`
 
 ```typescript
-// Example API route pattern (apps/api/src/routes/example.ts)
-import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
-import { prisma } from '@topline/db'
+// Example Server Action pattern (apps/web/actions/example.ts)
+'use server'
 
-const route = createRoute({
-  method: 'get',
-  path: '/examples',
-  request: { query: ExampleQuerySchema },
-  responses: { 200: { content: { 'application/json': { schema: ExampleResponseSchema } } } }
-})
+import { prisma } from '@/lib/db'
+import { requireAuth, requireRole } from '@/lib/auth/session'
+
+export interface ActionResult<T> {
+  success: boolean
+  data?: T
+  error?: string
+}
+
+export async function getExamples(params?: ExampleParams): Promise<ActionResult<Example[]>> {
+  try {
+    await requireRole('MANAGER', 'ADMIN')
+    const session = await requireAuth()
+
+    const examples = await prisma.example.findMany({
+      where: { organizationId: session.orgId },
+    })
+
+    return { success: true, data: examples }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+}
 ```
 
 ### Code Implementation - Frontend (apps/web/)
 - [ ] React Query hook created in `apps/web/hooks/queries/`
 - [ ] Uses `queryKeys` factory for cache keys
-- [ ] Uses `api` client from `lib/api-client.ts`
+- [ ] Calls Server Actions directly (no HTTP client)
+- [ ] Handles ActionResult pattern (throws on error for React Query)
 - [ ] Loading states handled with isLoading
 - [ ] Error states handled with error property
 - [ ] Empty states handled (check data length)
@@ -89,42 +108,79 @@ const route = createRoute({
 ```typescript
 // Example hook pattern (apps/web/hooks/queries/useExample.ts)
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
+import { getExamples, createExample } from '@/actions/examples'
 import { queryKeys } from '@/lib/query-keys'
+import { useAuth } from '@/context/AuthContext'
 
 export function useExamples(params?: ExampleParams) {
+  const { isAuthenticated } = useAuth()
+
   return useQuery({
     queryKey: queryKeys.examples.list(params),
-    queryFn: () => api.examples.list(params),
+    queryFn: async () => {
+      const result = await getExamples(params)
+      if (!result.success) throw new Error(result.error)
+      return result.data
+    },
     enabled: isAuthenticated,
+  })
+}
+
+export function useCreateExample() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (data: CreateExampleInput) => {
+      const result = await createExample(data)
+      if (!result.success) throw new Error(result.error)
+      return result.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.examples.all })
+    },
   })
 }
 ```
 
 ### Tests (MANDATORY - NO EXCEPTIONS)
 
-**API Tests** (co-located in `apps/api/src/routes/*.test.ts`):
-- [ ] Create test file next to route: `example.test.ts`
-- [ ] Use Vitest with Prisma mocks
+**Server Action Tests** (in `apps/web/__tests__/actions/`):
+- [ ] Create test file: `example.test.ts`
+- [ ] Mock Prisma and auth utilities
 - [ ] Test input validation
 - [ ] Test authorization (org isolation)
 - [ ] Test happy path and error cases
 
 ```typescript
-// Example test pattern (apps/api/src/routes/example.test.ts)
+// Example test pattern (apps/web/__tests__/actions/example.test.ts)
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-vi.mock('@topline/db', () => ({ prisma: { example: { findMany: vi.fn() } } }))
-import { prisma } from '@topline/db'
+import { getExamples } from '@/actions/examples'
 
-describe('Example API Routes', () => {
+vi.mock('@/lib/db', () => ({ prisma: { example: { findMany: vi.fn() } } }))
+vi.mock('@/lib/auth/session', () => ({
+  requireAuth: vi.fn().mockResolvedValue({ userId: '1', orgId: 'org-1' }),
+  requireRole: vi.fn(),
+}))
+
+import { prisma } from '@/lib/db'
+
+describe('Example Server Actions', () => {
   beforeEach(() => { vi.clearAllMocks() })
-  // tests...
+
+  it('returns examples for organization', async () => {
+    vi.mocked(prisma.example.findMany).mockResolvedValue([{ id: '1', name: 'Test' }])
+
+    const result = await getExamples()
+
+    expect(result.success).toBe(true)
+    expect(result.data).toHaveLength(1)
+  })
 })
 ```
 
-**Frontend Tests** (in `apps/web/__tests__/`):
-- [ ] Hook tests use MSW for API mocking
-- [ ] Add handlers to `apps/web/__tests__/mocks/handlers.ts`
+**Frontend Tests** (in `apps/web/__tests__/hooks/`):
+- [ ] Mock Server Actions
+- [ ] Test loading and error states
 
 ### Verification
 - [ ] `npm run typecheck` passes

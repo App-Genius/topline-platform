@@ -14,11 +14,11 @@ import {
 } from "lucide-react";
 import {
   useBehaviors,
-  useRoles,
   useCreateBehavior,
   useUpdateBehavior,
   useDeleteBehavior,
-} from "@/hooks/useApi";
+} from "@/hooks/queries/useBehaviors";
+import { useRoles } from "@/hooks/queries/useRoles";
 import {
   Modal,
   Button,
@@ -65,9 +65,14 @@ export default function BehaviorsPage() {
   const { data: rolesData } = useRoles();
 
   // Mutation hooks
-  const { createBehavior, isLoading: isCreating, error: createError } = useCreateBehavior();
-  const { updateBehavior, isLoading: isUpdating, error: updateError } = useUpdateBehavior();
-  const { deleteBehavior, isLoading: isDeleting } = useDeleteBehavior();
+  const createMutation = useCreateBehavior();
+  const updateMutation = useUpdateBehavior();
+  const deleteMutation = useDeleteBehavior();
+  const isCreating = createMutation.isPending;
+  const isUpdating = updateMutation.isPending;
+  const isDeleting = deleteMutation.isPending;
+  const createError = createMutation.error;
+  const updateError = updateMutation.error;
 
   // Local state
   const [showInactive, setShowInactive] = useState(false);
@@ -151,14 +156,17 @@ export default function BehaviorsPage() {
 
     try {
       if (editingBehavior) {
-        await updateBehavior(editingBehavior.id, {
-          name: formData.name,
-          description: formData.description || undefined,
-          points: formData.points,
-          roleIds: formData.roleIds,
+        await updateMutation.mutateAsync({
+          id: editingBehavior.id,
+          data: {
+            name: formData.name,
+            description: formData.description || undefined,
+            points: formData.points,
+            roleIds: formData.roleIds,
+          },
         });
       } else {
-        await createBehavior({
+        await createMutation.mutateAsync({
           name: formData.name,
           description: formData.description || undefined,
           points: formData.points,
@@ -177,7 +185,7 @@ export default function BehaviorsPage() {
     if (!deleteBehaviorId) return;
 
     try {
-      await deleteBehavior(deleteBehaviorId);
+      await deleteMutation.mutateAsync(deleteBehaviorId);
       setDeleteBehaviorId(null);
       refetchBehaviors();
     } catch (err) {
@@ -307,7 +315,7 @@ export default function BehaviorsPage() {
       {(behaviorsError || pageError) && (
         <div className="mb-6">
           <ErrorAlert
-            message={behaviorsError || pageError || "An error occurred"}
+            message={behaviorsError?.message || pageError || "An error occurred"}
             onDismiss={() => setPageError(null)}
           />
         </div>
@@ -377,7 +385,7 @@ export default function BehaviorsPage() {
         size="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-6">
-          {formError && <ErrorAlert message={formError} />}
+          {formError && <ErrorAlert message={formError.message} />}
 
           <FormField
             label="Behavior Name"

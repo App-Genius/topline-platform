@@ -4,21 +4,22 @@ This document defines the technical architecture and coding patterns for the Top
 
 ## System Overview
 
-Topline is a monorepo containing:
+Topline is a Next.js application with Server Actions for backend logic:
 
 ```
 topline/
-├── apps/
-│   ├── web/          # Next.js frontend
-│   └── api/          # Hono API backend
-├── packages/
-│   ├── db/           # Prisma client & schema
-│   └── shared/       # Shared types, schemas, utilities
+├── apps/web/          # Next.js application
+│   ├── app/           # App Router pages
+│   ├── actions/       # Server Actions (business logic)
+│   ├── components/    # React components
+│   ├── hooks/         # Custom hooks (React Query)
+│   ├── lib/           # Utilities, database, auth
+│   └── prisma/        # Database schema
 ```
 
 ## Layer Responsibilities
 
-### 1. Pages (`apps/web/app/**/page.tsx`)
+### 1. Pages (`app/**/page.tsx`)
 
 **Purpose**: Route entry points only
 
@@ -29,7 +30,7 @@ topline/
 - Handle loading/error states from hooks
 
 **Forbidden**:
-- Direct API calls (`api.*`)
+- Direct Server Action calls (use hooks instead)
 - Inline mock data (`const MOCK_* = {}`)
 - Business logic or calculations
 - More than ~50 lines of JSX
@@ -54,7 +55,7 @@ export default function UsersPage() {
 
 ---
 
-### 2. Feature Components (`apps/web/components/features/`)
+### 2. Feature Components (`components/features/`)
 
 **Purpose**: Domain-specific UI with interactions
 
@@ -65,7 +66,7 @@ export default function UsersPage() {
 - Emit events via callback props
 
 **Forbidden**:
-- Direct API calls
+- Direct Server Action calls
 - Import other Feature Components (use composition in pages)
 
 **Pattern**:
@@ -90,7 +91,7 @@ export function UserList({ users, isLoading, onEdit, onDelete }: UserListProps) 
 
 ---
 
-### 3. UI Components (`apps/web/components/ui/`)
+### 3. UI Components (`components/ui/`)
 
 **Purpose**: Pure presentational, reusable across the app
 
@@ -101,7 +102,7 @@ export function UserList({ users, isLoading, onEdit, onDelete }: UserListProps) 
 
 **Forbidden**:
 - Hooks that fetch data
-- Import API client
+- Import Server Actions
 - Import other feature or page components
 - Business logic
 
@@ -137,13 +138,13 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 
 ---
 
-### 4. Hooks (`apps/web/hooks/`)
+### 4. Hooks (`hooks/queries/`)
 
-**Purpose**: Data fetching, mutations, state management
+**Purpose**: Data fetching, mutations, state management via React Query
 
 **Allowed**:
-- Call API client
-- Manage loading/error states
+- Call Server Actions
+- Manage loading/error states via React Query
 - Check authentication
 - Handle caching/revalidation
 
@@ -153,68 +154,92 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 
 **Pattern**:
 ```tsx
-export function useUsers(filters?: UserFilters) {
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getUsers, createUser } from "@/actions/users";
+import { queryKeys } from "@/lib/query-keys";
+import { useAuth } from "@/context/AuthContext";
+
+export function useUsers(params?: UserListParams) {
   const { isAuthenticated } = useAuth();
-  const [data, setData] = useState<PaginatedResponse<User> | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
 
-  const fetch = useCallback(async () => {
-    if (!isAuthenticated) return;
+  return useQuery({
+    queryKey: queryKeys.users.list(params),
+    queryFn: async () => {
+      const result = await getUsers(params);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    enabled: isAuthenticated,
+  });
+}
 
-    try {
-      setIsLoading(true);
-      const result = await api.users.list(filters);
-      setData(result);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e : new Error('Unknown error'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isAuthenticated, filters]);
+export function useCreateUser() {
+  const queryClient = useQueryClient();
 
-  useEffect(() => { fetch(); }, [fetch]);
-
-  return { data, isLoading, error, refetch: fetch };
+  return useMutation({
+    mutationFn: async (data: CreateUserInput) => {
+      const result = await createUser(data);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
+    },
+  });
 }
 ```
 
 ---
 
-### 5. API Client (`apps/web/lib/api-client.ts`)
+### 5. Server Actions (`actions/`)
 
-**Purpose**: HTTP layer only
+**Purpose**: Backend business logic with database access
 
 **Allowed**:
-- Type-safe fetch wrappers
-- Token management
-- Request/response transformation
+- Database queries via Prisma
+- Authentication/authorization checks
+- Data validation
+- Business logic
 
 **Forbidden**:
-- Business logic
-- Caching logic (that's for hooks)
+- Import React components
+- Client-side state management
 
-**Usage**:
+**Pattern**:
 ```tsx
-// NEVER call directly from pages
-// ALWAYS use via hooks
+'use server'
 
-// In hooks/useApi.ts:
-import { api } from '@/lib/api-client';
+import { prisma } from '@/lib/db'
+import { requireAuth, requireRole } from '@/lib/auth/session'
 
-export function useUsers() {
-  return useApiCall(() => api.users.list());
+export interface ActionResult<T> {
+  success: boolean
+  data?: T
+  error?: string
 }
 
-// In pages:
-const { data } = useUsers();  // Correct
-const data = await api.users.list();  // WRONG
+export async function getUsers(params?: UserListParams): Promise<ActionResult<PaginatedResponse<User>>> {
+  try {
+    await requireRole('MANAGER', 'ADMIN')
+    const session = await requireAuth()
+
+    const users = await prisma.user.findMany({
+      where: { organizationId: session.orgId },
+      include: { role: true },
+      take: params?.limit ?? 50,
+      skip: ((params?.page ?? 1) - 1) * (params?.limit ?? 50),
+    })
+
+    return { success: true, data: { data: users, pagination: { ... } } }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+}
 ```
 
 ---
 
-### 6. Services (`apps/web/lib/services/`)
+### 6. Services (`lib/services/`)
 
 **Purpose**: Business logic, calculations, transformations
 
@@ -254,27 +279,73 @@ export function groupBehaviorsByUser(logs: BehaviorLog[]): Map<string, BehaviorL
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      Custom Hook (useUsers)                     │
-│  - Manages state                                                │
-│  - Calls API client                                             │
+│                    React Query Hook (useUsers)                  │
+│  - Manages cache                                                │
+│  - Calls Server Actions                                         │
 │  - Returns { data, isLoading, error, refetch }                 │
 └─────────────────────────┬───────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    API Client (api.users.*)                     │
-│  - HTTP fetch                                                   │
-│  - Token management                                             │
-│  - Type-safe responses                                          │
+│                     Server Action (getUsers)                    │
+│  - Authentication check                                         │
+│  - Database query via Prisma                                    │
+│  - Returns ActionResult<T>                                      │
 └─────────────────────────┬───────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      Hono API (apps/api)                        │
-│  - Route handlers                                               │
-│  - Validation                                                   │
-│  - Database queries                                             │
+│                      Prisma (lib/db.ts)                         │
+│  - Type-safe database queries                                   │
+│  - PostgreSQL connection                                        │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Authentication Architecture
+
+### Cookie-Based Sessions
+
+Authentication uses HTTP-only cookies with signed JWTs:
+
+```tsx
+// lib/auth/session.ts
+export interface SessionPayload {
+  userId: string
+  email: string
+  orgId: string
+  roleType: string
+  permissions: string[]
+}
+
+// Session functions
+createSession(payload)   // Set cookie on login
+getSession()             // Read session from cookie
+destroySession()         // Clear cookie on logout
+requireAuth()            // Throw if not authenticated
+requireRole(...roles)    // Throw if not authorized
+```
+
+### Auth Flow
+
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│   Login     │───▶│  Server     │───▶│  Set Cookie │
+│   Form      │    │  Action     │    │  (HTTP-only)│
+└─────────────┘    └─────────────┘    └─────────────┘
+                                              │
+                                              ▼
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│   Page      │───▶│  Hook       │───▶│  Server     │
+│   Load      │    │  (Query)    │    │  Action     │
+└─────────────┘    └─────────────┘    └─────────────┘
+                                              │
+                                              ▼
+                                      ┌─────────────┐
+                                      │  Read       │
+                                      │  Cookie     │
+                                      └─────────────┘
 ```
 
 ---
@@ -294,9 +365,10 @@ interface DemoContextValue {
   triggerScenario: (scenario: DemoScenario) => void;
 }
 
-// hooks/useApi.ts - Demo-aware hook
+// hooks/queries/useUsers.ts - Demo-aware hook
 export function useUsers() {
   const { isDemoMode, mockData } = useDemo();
+  const { isAuthenticated } = useAuth();
 
   // In demo mode, return mock data immediately
   if (isDemoMode) {
@@ -308,14 +380,16 @@ export function useUsers() {
     };
   }
 
-  // In production, fetch from API
-  return useApiCall(() => api.users.list());
-}
-
-// pages/admin/users/page.tsx - Unaware of demo mode
-export default function UsersPage() {
-  const { data, isLoading } = useUsers();  // Works in both modes
-  // ...
+  // In production, call Server Actions
+  return useQuery({
+    queryKey: queryKeys.users.list(),
+    queryFn: async () => {
+      const result = await getUsers();
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    enabled: isAuthenticated,
+  });
 }
 ```
 
@@ -339,7 +413,8 @@ export default function UsersPage() {
 | Layer | Tool | Coverage |
 |-------|------|----------|
 | UI Components | Vitest + Testing Library | 90% |
-| Hooks | Vitest + MSW | 90% |
+| Hooks | Vitest | 90% |
+| Server Actions | Vitest | 90% |
 | Feature Components | Vitest + Testing Library | 80% |
 | E2E Flows | Playwright | Critical paths |
 
@@ -356,9 +431,10 @@ apps/web/
 │   │       └── UserList.test.tsx
 │   ├── hooks/
 │   │   └── useUsers.test.ts
+│   ├── actions/
+│   │   └── users.test.ts
 │   └── mocks/
-│       ├── handlers.ts
-│       └── server.ts
+│       └── prisma.ts
 ├── e2e/
 │   └── flows/
 │       ├── user-management.spec.ts
@@ -367,32 +443,47 @@ apps/web/
 
 ### Test Patterns
 
-**UI Component Test**:
+**Server Action Test**:
 ```tsx
-describe('Modal', () => {
-  it('renders when open', () => {
-    render(<Modal isOpen={true} onClose={jest.fn()} title="Test">Content</Modal>);
-    expect(screen.getByText('Test')).toBeInTheDocument();
-  });
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { getUsers } from '@/actions/users';
+import { prisma } from '@/lib/db';
 
-  it('calls onClose when backdrop clicked', () => {
-    const onClose = jest.fn();
-    render(<Modal isOpen={true} onClose={onClose} title="Test">Content</Modal>);
-    fireEvent.click(screen.getByTestId('modal-backdrop'));
-    expect(onClose).toHaveBeenCalled();
+vi.mock('@/lib/db');
+vi.mock('@/lib/auth/session', () => ({
+  requireAuth: vi.fn().mockResolvedValue({ userId: '1', orgId: 'org-1' }),
+  requireRole: vi.fn(),
+}));
+
+describe('getUsers', () => {
+  it('returns paginated users', async () => {
+    vi.mocked(prisma.user.findMany).mockResolvedValue([{ id: '1', name: 'Test' }]);
+
+    const result = await getUsers({ page: 1, limit: 10 });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.data).toHaveLength(1);
   });
 });
 ```
 
 **Hook Test**:
 ```tsx
-describe('useUsers', () => {
-  it('fetches users', async () => {
-    server.use(
-      rest.get('/api/users', (_, res, ctx) => res(ctx.json({ data: [{ id: '1' }] })))
-    );
+import { renderHook, waitFor } from '@testing-library/react';
+import { useUsers } from '@/hooks/queries/useUsers';
+import { getUsers } from '@/actions/users';
 
-    const { result } = renderHook(() => useUsers());
+vi.mock('@/actions/users');
+
+describe('useUsers', () => {
+  it('fetches users via Server Action', async () => {
+    vi.mocked(getUsers).mockResolvedValue({
+      success: true,
+      data: { data: [{ id: '1' }], pagination: {} }
+    });
+
+    const { result } = renderHook(() => useUsers(), { wrapper: TestProviders });
+
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.data?.data).toHaveLength(1);
   });
@@ -403,44 +494,32 @@ describe('useUsers', () => {
 
 ## Error Handling
 
-### API Errors
+### Server Action Errors
 
-All API errors should be handled consistently:
+All Server Actions return a consistent `ActionResult<T>` type:
 
 ```tsx
-// lib/api-client.ts
-export class ApiError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-    public status: number,
-    public details?: Record<string, unknown>
-  ) {
-    super(message);
-  }
+export interface ActionResult<T> {
+  success: boolean
+  data?: T
+  error?: string
 }
 
-// In hooks - errors are returned, not thrown
-export function useUsers() {
-  const [error, setError] = useState<Error | null>(null);
-
+// In Server Actions
+export async function createUser(data: CreateUserInput): Promise<ActionResult<User>> {
   try {
-    const data = await api.users.list();
-  } catch (e) {
-    setError(e instanceof ApiError ? e : new Error('Unknown error'));
-  }
-
-  return { data, error };
-}
-
-// In pages - display errors
-export default function UsersPage() {
-  const { error } = useUsers();
-
-  if (error) {
-    return <ErrorAlert message={error.message} />;
+    await requireRole('ADMIN');
+    const user = await prisma.user.create({ data });
+    return { success: true, data: user };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
+
+// In hooks - convert to thrown errors for React Query
+const result = await createUser(data);
+if (!result.success) throw new Error(result.error);
+return result.data;
 ```
 
 ### Loading States
@@ -484,7 +563,7 @@ These UI components must be used instead of inline implementations:
 
 Before merging any PR:
 
-- [ ] No direct `api.*` calls in pages
+- [ ] No direct Server Action calls in pages (use hooks)
 - [ ] No `MOCK_*` constants outside DemoContext
 - [ ] All data comes from hooks
 - [ ] UI components from `components/ui/` used

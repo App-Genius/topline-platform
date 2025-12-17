@@ -2,7 +2,7 @@
 
 import { useState, FormEvent } from "react";
 import Link from "next/link";
-import { api } from "@/lib/api-client";
+import { submitQuestionnaire } from "@/actions/questionnaire";
 import { Check, ChevronLeft, ChevronRight, Building2, Users, TrendingUp, DollarSign, Target, AlertCircle } from "lucide-react";
 
 type Industry = "RESTAURANT" | "RETAIL" | "HOSPITALITY" | "OTHER";
@@ -119,7 +119,7 @@ export default function QuestionnairePage() {
     setError(null);
 
     try {
-      const response = await api.questionnaire.submit({
+      const result = await submitQuestionnaire({
         email: formData.email,
         companyName: formData.companyName,
         industry: formData.industry,
@@ -135,7 +135,8 @@ export default function QuestionnairePage() {
           existingRoles: formData.existingRoles,
         },
       });
-      setResult(response);
+      if (!result.success) throw new Error(result.error);
+      setResult(result.data!);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit questionnaire");
     } finally {

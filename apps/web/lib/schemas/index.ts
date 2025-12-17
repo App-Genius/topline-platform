@@ -59,7 +59,7 @@ export const organizationSchema = z.object({
   id: z.string().cuid(),
   name: z.string().min(1).max(100),
   industry: industrySchema,
-  settings: z.record(z.unknown()).default({}),
+  settings: z.record(z.string(), z.unknown()).default({}),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 })
@@ -181,7 +181,7 @@ export const behaviorLogSchema = z.object({
   userId: z.string().cuid(),
   behaviorId: z.string().cuid(),
   locationId: z.string().cuid().nullable(),
-  metadata: z.record(z.unknown()).default({}),
+  metadata: z.record(z.string(), z.unknown()).default({}),
   verified: z.boolean().default(false),
   verifiedById: z.string().cuid().nullable(),
   verifiedAt: z.coerce.date().nullable(),
@@ -320,8 +320,8 @@ export const questionnaireSubmissionSchema = z.object({
   companyName: z.string().min(1).max(100),
   industry: industrySchema,
   employeeCount: z.string(),
-  responses: z.record(z.unknown()),
-  scores: z.record(z.number()),
+  responses: z.record(z.string(), z.unknown()),
+  scores: z.record(z.string(), z.number()),
   contacted: z.boolean().default(false),
   convertedToOrg: z.string().cuid().nullable(),
   createdAt: z.coerce.date(),
@@ -372,7 +372,7 @@ export const apiErrorSchema = z.object({
   error: z.object({
     code: z.string(),
     message: z.string(),
-    details: z.record(z.unknown()).optional(),
+    details: z.record(z.string(), z.unknown()).optional(),
   }),
 })
 export type ApiError = z.infer<typeof apiErrorSchema>

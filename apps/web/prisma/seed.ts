@@ -4,7 +4,7 @@ import { hash } from 'bcryptjs'
 const prisma = new PrismaClient()
 
 async function main() {
-  console.log('🌱 Seeding database...')
+  console.log('Seeding database...')
 
   // Create demo organization
   const org = await prisma.organization.create({
@@ -17,7 +17,7 @@ async function main() {
       },
     },
   })
-  console.log(`✅ Created organization: ${org.name}`)
+  console.log(`Created organization: ${org.name}`)
 
   // Create roles
   const roles = await Promise.all([
@@ -62,7 +62,7 @@ async function main() {
       },
     }),
   ])
-  console.log(`✅ Created ${roles.length} roles`)
+  console.log(`Created ${roles.length} roles`)
 
   const [adminRole, managerRole, serverRole, hostRole, bartenderRole] = roles
 
@@ -140,7 +140,7 @@ async function main() {
       },
     }),
   ])
-  console.log(`✅ Created ${users.length} users`)
+  console.log(`Created ${users.length} users`)
 
   // Create location
   const location = await prisma.location.create({
@@ -150,7 +150,7 @@ async function main() {
       organizationId: org.id,
     },
   })
-  console.log(`✅ Created location: ${location.name}`)
+  console.log(`Created location: ${location.name}`)
 
   // Create behaviors
   const behaviors = await Promise.all([
@@ -205,7 +205,7 @@ async function main() {
       },
     }),
   ])
-  console.log(`✅ Created ${behaviors.length} behaviors`)
+  console.log(`Created ${behaviors.length} behaviors`)
 
   // Create KPIs
   const kpis = await Promise.all([
@@ -246,7 +246,7 @@ async function main() {
       },
     }),
   ])
-  console.log(`✅ Created ${kpis.length} KPIs`)
+  console.log(`Created ${kpis.length} KPIs`)
 
   // Create benchmark
   const benchmark = await prisma.benchmark.create({
@@ -259,7 +259,7 @@ async function main() {
       baselineRating: 4.2,
     },
   })
-  console.log(`✅ Created benchmark for ${benchmark.year}`)
+  console.log(`Created benchmark for ${benchmark.year}`)
 
   // Create sample daily entries for the last 30 days
   const today = new Date()
@@ -284,7 +284,7 @@ async function main() {
     )
   }
   await Promise.all(dailyEntries)
-  console.log(`✅ Created ${dailyEntries.length} daily entries`)
+  console.log(`Created ${dailyEntries.length} daily entries`)
 
   // Create sample behavior logs
   const behaviorLogs = []
@@ -323,7 +323,7 @@ async function main() {
     }
   }
   await Promise.all(behaviorLogs)
-  console.log(`✅ Created ${behaviorLogs.length} behavior logs`)
+  console.log(`Created ${behaviorLogs.length} behavior logs`)
 
   // Create training topics
   const topics = await Promise.all([
@@ -353,10 +353,10 @@ async function main() {
       },
     }),
   ])
-  console.log(`✅ Created ${topics.length} training topics`)
+  console.log(`Created ${topics.length} training topics`)
 
-  console.log('\n🎉 Seed completed successfully!')
-  console.log('\n📧 Demo accounts:')
+  console.log('\nSeed completed successfully!')
+  console.log('\nDemo accounts:')
   console.log('   admin@topline.demo / demo123')
   console.log('   manager@topline.demo / demo123')
   console.log('   sam@topline.demo / demo123')
@@ -364,7 +364,7 @@ async function main() {
 
 main()
   .catch((e) => {
-    console.error('❌ Seed failed:', e)
+    console.error('Seed failed:', e)
     process.exit(1)
   })
   .finally(async () => {

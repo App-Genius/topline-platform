@@ -1,10 +1,10 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { queryOptions } from "@/lib/query-client";
 import { useAuth } from "@/context/AuthContext";
+import { getCurrentOrganization, updateOrganization } from "@/actions/organizations";
 
 // Types
 interface ScoreboardMetric {
@@ -81,18 +81,21 @@ export function useSettings() {
   return useQuery({
     queryKey: queryKeys.settings.current(),
     queryFn: async (): Promise<SettingsData> => {
-      // Try to get organization settings from API
+      // Try to get organization settings from Server Action
       try {
-        const org = await api.organizations.getCurrent();
-        return {
-          ...DEFAULT_SETTINGS,
-          organization: {
-            name: org.name,
-            industry: org.industry || "RESTAURANT",
-          },
-        };
+        const result = await getCurrentOrganization();
+        if (result.success && result.data) {
+          return {
+            ...DEFAULT_SETTINGS,
+            organization: {
+              name: result.data.name,
+              industry: result.data.industry || "RESTAURANT",
+            },
+          };
+        }
+        return DEFAULT_SETTINGS;
       } catch {
-        // Return defaults if API fails
+        // Return defaults if action fails
         return DEFAULT_SETTINGS;
       }
     },
@@ -139,11 +142,6 @@ export function useNotificationSettings() {
 
 /**
  * Hook for updating settings
- *
- * Features:
- * - Optimistic updates for instant UI feedback
- * - Rollback on error
- * - Proper cache invalidation
  */
 export function useUpdateSettings() {
   const queryClient = useQueryClient();
@@ -152,10 +150,13 @@ export function useUpdateSettings() {
     mutationFn: async (data: UpdateSettingsInput): Promise<SettingsData> => {
       // Update organization if changed
       if (data.organization) {
-        await api.organizations.update({
+        const result = await updateOrganization({
           name: data.organization.name,
-          settings: data.organization as Record<string, unknown>,
+          industry: data.organization.industry,
         });
+        if (!result.success) {
+          throw new Error(result.error);
+        }
       }
 
       // TODO: Add API calls for scoreboard and notifications when endpoints exist

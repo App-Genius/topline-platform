@@ -1,6 +1,28 @@
 import { test as base, expect } from "@playwright/test";
+import { SignJWT } from "jose";
 
-// Mock data for API responses - matches API response structure
+// Session secret - must match lib/auth/session.ts
+const SESSION_SECRET = new TextEncoder().encode(
+  process.env.SESSION_SECRET || "topline-dev-secret-change-in-production-min-32-chars"
+);
+const SESSION_COOKIE = "topline_session";
+
+// Helper to create a test session token
+async function createTestSessionToken(payload: {
+  userId: string;
+  email: string;
+  orgId: string;
+  roleType: string;
+  permissions: string[];
+}): Promise<string> {
+  return new SignJWT({ ...payload })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("7d")
+    .sign(SESSION_SECRET);
+}
+
+// Mock data for tests - matches database structure
 export const mockUser = {
   id: "user-1",
   email: "manager@demo.com",
@@ -113,121 +135,40 @@ export const mockInsights = {
   },
 };
 
-// Extended test with authentication
+/**
+ * Extended test with authentication via session cookie
+ *
+ * NOTE: With Server Actions, data is fetched directly from the database,
+ * not through HTTP endpoints. For e2e tests to work properly, you need
+ * either:
+ * 1. A seeded test database with matching user/org IDs
+ * 2. Run tests in demo mode where hooks return mock data
+ *
+ * The session cookie is set correctly for authentication.
+ */
 export const test = base.extend<{ authenticatedPage: typeof base }>({
-  page: async ({ page }, use) => {
-    // Set auth token in localStorage BEFORE any navigation
-    await page.addInitScript(() => {
-      // Set the access token that api-client.ts checks
-      window.localStorage.setItem("topline_access_token", "mock-access-token");
-      window.localStorage.setItem("topline_refresh_token", "mock-refresh-token");
+  page: async ({ page, context }, use) => {
+    // Create a valid session token
+    const sessionToken = await createTestSessionToken({
+      userId: mockUser.id,
+      email: mockUser.email,
+      orgId: mockUser.organizationId,
+      roleType: "MANAGER",
+      permissions: ["read", "write", "manage"],
     });
 
-    // Mock /auth/me endpoint (called by AuthContext on mount)
-    await page.route("**/auth/me", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          id: "user-1",
-          email: "manager@demo.com",
-          name: "Demo Manager",
-          avatar: null,
-          isActive: true,
-          roleId: "role-1",
-          organizationId: "org-1",
-          role: {
-            id: "role-1",
-            name: "Manager",
-            type: "manager",
-            permissions: ["read", "write", "manage"],
-          },
-          organization: {
-            id: "org-1",
-            name: "Demo Restaurant",
-            industry: "RESTAURANT",
-          },
-        }),
-      });
-    });
-
-    // Mock /auth/refresh endpoint
-    await page.route("**/auth/refresh", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          accessToken: "mock-access-token",
-          refreshToken: "mock-refresh-token",
-        }),
-      });
-    });
-
-    // Mock organization API
-    await page.route("**/api/organizations/**", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(mockOrganization),
-      });
-    });
-
-    // Mock briefing API
-    await page.route("**/api/briefing**", async (route) => {
-      if (route.request().method() === "POST") {
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            briefingId: mockBriefing.id,
-            attendeeIds: ["1", "2"],
-            completedAt: new Date().toISOString(),
-          }),
-        });
-      } else {
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify(mockBriefing),
-        });
-      }
-    });
-
-    // Mock budget API
-    await page.route("**/api/budget**", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(mockBudget),
-      });
-    });
-
-    // Mock settings API
-    await page.route("**/api/settings**", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(mockSettings),
-      });
-    });
-
-    // Mock insights API
-    await page.route("**/api/insights**", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(mockInsights),
-      });
-    });
-
-    // Mock users API
-    await page.route("**/api/users**", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify([mockUser]),
-      });
-    });
+    // Set the session cookie BEFORE any navigation
+    await context.addCookies([
+      {
+        name: SESSION_COOKIE,
+        value: sessionToken,
+        domain: "localhost",
+        path: "/",
+        httpOnly: true,
+        secure: false, // false for localhost
+        sameSite: "Lax",
+      },
+    ]);
 
     await use(page);
   },

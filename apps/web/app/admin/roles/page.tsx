@@ -8,7 +8,7 @@ import {
   useCreateRole,
   useUpdateRole,
   useDeleteRole,
-} from "@/hooks/useApi";
+} from "@/hooks/queries/useRoles";
 import {
   Modal,
   Button,
@@ -65,9 +65,14 @@ export default function RolesPage() {
   } = useRoles();
 
   // Mutation hooks
-  const { createRole, isLoading: isCreating, error: createError } = useCreateRole();
-  const { updateRole, isLoading: isUpdating, error: updateError } = useUpdateRole();
-  const { deleteRole, isLoading: isDeleting } = useDeleteRole();
+  const createMutation = useCreateRole();
+  const updateMutation = useUpdateRole();
+  const deleteMutation = useDeleteRole();
+  const isCreating = createMutation.isPending;
+  const isUpdating = updateMutation.isPending;
+  const isDeleting = deleteMutation.isPending;
+  const createError = createMutation.error;
+  const updateError = updateMutation.error;
 
   // Local state
   const [showModal, setShowModal] = useState(false);
@@ -134,12 +139,15 @@ export default function RolesPage() {
 
     try {
       if (editingRole) {
-        await updateRole(editingRole.id, {
-          name: formData.name,
-          permissions: formData.permissions,
+        await updateMutation.mutateAsync({
+          id: editingRole.id,
+          data: {
+            name: formData.name,
+            permissions: formData.permissions,
+          },
         });
       } else {
-        await createRole({
+        await createMutation.mutateAsync({
           name: formData.name,
           permissions: formData.permissions,
         });
@@ -155,7 +163,7 @@ export default function RolesPage() {
     if (!deleteRoleId) return;
 
     try {
-      await deleteRole(deleteRoleId);
+      await deleteMutation.mutateAsync(deleteRoleId);
       setDeleteRoleId(null);
       refetchRoles();
     } catch (err) {
@@ -209,7 +217,7 @@ export default function RolesPage() {
       {(rolesError || pageError) && (
         <div className="mb-6">
           <ErrorAlert
-            message={rolesError || pageError || "An error occurred"}
+            message={rolesError?.message || pageError || "An error occurred"}
             onDismiss={() => setPageError(null)}
           />
         </div>
@@ -304,7 +312,7 @@ export default function RolesPage() {
         size="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-6">
-          {formError && <ErrorAlert message={formError} />}
+          {formError && <ErrorAlert message={formError.message} />}
 
           <FormField
             label="Role Name"

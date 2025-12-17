@@ -1,9 +1,22 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, ApiError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { useAuth } from "@/context/AuthContext";
+import {
+  getBehaviors,
+  getBehavior,
+  getBehaviorStats,
+  createBehavior,
+  updateBehavior,
+  deleteBehavior,
+} from "@/actions/behaviors";
+import {
+  getBehaviorLogs,
+  getPendingLogs,
+  createBehaviorLog,
+  verifyBehaviorLog,
+} from "@/actions/behavior-logs";
 
 // Types
 interface Behavior {
@@ -65,17 +78,18 @@ export function useBehaviors(params?: BehaviorListParams) {
   const { isAuthenticated } = useAuth();
 
   return useQuery({
-    queryKey: queryKeys.behaviors.list(params),
+    queryKey: queryKeys.behaviors.list(params as Record<string, unknown>),
     queryFn: async () => {
-      const response = await api.behaviors.list({
+      const result = await getBehaviors({
         page: params?.page ?? 1,
         limit: params?.limit ?? 100,
         ...params,
       });
-      return response.data;
+      if (!result.success) throw new Error(result.error);
+      return result.data?.data;
     },
     enabled: isAuthenticated,
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 60 * 1000,
   });
 }
 
@@ -88,7 +102,9 @@ export function useBehavior(id: string) {
   return useQuery({
     queryKey: queryKeys.behaviors.detail(id),
     queryFn: async () => {
-      return api.behaviors.get(id);
+      const result = await getBehavior(id);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
     },
     enabled: isAuthenticated && !!id,
   });
@@ -103,10 +119,12 @@ export function useBehaviorStats(behaviorId: string, days = 30) {
   return useQuery({
     queryKey: queryKeys.behaviors.stats(behaviorId, days),
     queryFn: async () => {
-      return api.behaviors.getStats(behaviorId, days) as Promise<BehaviorStats>;
+      const result = await getBehaviorStats(behaviorId, days);
+      if (!result.success) throw new Error(result.error);
+      return result.data as BehaviorStats;
     },
     enabled: isAuthenticated && !!behaviorId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -118,13 +136,15 @@ export function useCreateBehavior() {
 
   return useMutation({
     mutationFn: async (data: CreateBehaviorInput) => {
-      return api.behaviors.create({
+      const result = await createBehavior({
         name: data.name,
         description: data.description,
         points: data.points,
         targetPerDay: data.targetPerDay ?? 5,
         roleIds: data.roleIds,
       });
+      if (!result.success) throw new Error(result.error);
+      return result.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.behaviors.all });
@@ -140,7 +160,9 @@ export function useUpdateBehavior() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateBehaviorInput }) => {
-      return api.behaviors.update(id, data);
+      const result = await updateBehavior(id, data);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
     },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.behaviors.detail(id) });
@@ -157,11 +179,12 @@ export function useDeleteBehavior() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      return api.behaviors.delete(id);
+      const result = await deleteBehavior(id);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.behaviors.all });
-      // Also invalidate behavior logs
       queryClient.invalidateQueries({ queryKey: queryKeys.behaviorLogs.all });
     },
   });
@@ -172,7 +195,6 @@ export function useDeleteBehavior() {
  */
 export function getBehaviorMutationError(error: unknown): string | null {
   if (!error) return null;
-  if (error instanceof ApiError) return error.message;
   if (error instanceof Error) return error.message;
   return "An unexpected error occurred";
 }
@@ -200,8 +222,8 @@ interface BehaviorLogListParams {
   userId?: string;
   behaviorId?: string;
   verified?: boolean;
-  startDate?: string;
-  endDate?: string;
+  startDate?: Date;
+  endDate?: Date;
 }
 
 interface CreateBehaviorLogInput {
@@ -216,16 +238,18 @@ export function useBehaviorLogs(params?: BehaviorLogListParams) {
   const { isAuthenticated } = useAuth();
 
   return useQuery({
-    queryKey: queryKeys.behaviorLogs.list(params),
+    queryKey: queryKeys.behaviorLogs.list(params as Record<string, unknown>),
     queryFn: async () => {
-      return api.behaviorLogs.list({
+      const result = await getBehaviorLogs({
         page: params?.page ?? 1,
         limit: params?.limit ?? 50,
         ...params,
       });
+      if (!result.success) throw new Error(result.error);
+      return result.data;
     },
     enabled: isAuthenticated,
-    staleTime: 30 * 1000, // 30 seconds - logs change frequently
+    staleTime: 30 * 1000,
   });
 }
 
@@ -238,7 +262,9 @@ export function usePendingVerifications() {
   return useQuery({
     queryKey: queryKeys.behaviorLogs.pending(),
     queryFn: async () => {
-      return api.behaviorLogs.getPending();
+      const result = await getPendingLogs();
+      if (!result.success) throw new Error(result.error);
+      return result.data;
     },
     enabled: isAuthenticated,
     staleTime: 30 * 1000,
@@ -253,11 +279,12 @@ export function useLogBehavior() {
 
   return useMutation({
     mutationFn: async (data: CreateBehaviorLogInput) => {
-      return api.behaviorLogs.create(data);
+      const result = await createBehaviorLog(data);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.behaviorLogs.all });
-      // Also invalidate dashboard for real-time updates
       queryClient.invalidateQueries({ queryKey: queryKeys.organization.dashboard() });
     },
   });
@@ -271,7 +298,9 @@ export function useVerifyBehavior() {
 
   return useMutation({
     mutationFn: async ({ id, verified }: { id: string; verified: boolean }) => {
-      return api.behaviorLogs.verify(id, verified);
+      const result = await verifyBehaviorLog(id, verified);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.behaviorLogs.all });

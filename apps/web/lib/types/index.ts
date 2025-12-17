@@ -33,13 +33,13 @@ export type {
   CreateQuestionnaireSubmissionInput,
   PaginationInput,
   ApiError,
-} from '../schemas'
+} from '@/lib/schemas'
 
 // ============================================
 // EXTENDED TYPES (with relations)
 // ============================================
 
-import type { User, Role, Behavior, BehaviorLog, Organization } from '../schemas'
+import type { User, Role, Behavior, BehaviorLog, Organization } from '@/lib/schemas'
 
 export interface UserWithRole extends User {
   role: Role
@@ -161,5 +161,29 @@ export interface AdminDashboard {
     satisfaction: number
     churnRisk: boolean
     message: string
+  }
+}
+
+// ============================================
+// SERVER ACTION RESULT TYPE
+// ============================================
+
+export interface ActionResult<T> {
+  success: boolean
+  data?: T
+  error?: string
+}
+
+// ============================================
+// PAGINATED RESPONSE
+// ============================================
+
+export interface PaginatedResponse<T> {
+  data: T[]
+  meta: {
+    total: number
+    page: number
+    limit: number
+    totalPages: number
   }
 }

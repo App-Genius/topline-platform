@@ -1,14 +1,14 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { api, setAccessToken, getAccessToken, ApiError } from '../lib/api-client';
+import { login as loginAction, register as registerAction, logout as logoutAction, getCurrentUser } from '@/actions/auth';
 
-// Types from API
+// Types
 interface Role {
   id: string;
   name: string;
   type: string;
-  permissions?: string[];
+  permissions?: unknown;
 }
 
 interface Organization {
@@ -39,34 +39,12 @@ interface AuthState {
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string, organizationName: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   clearError: () => void;
   refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Refresh token storage
-let refreshToken: string | null = null;
-
-function setRefreshToken(token: string | null) {
-  refreshToken = token;
-  if (typeof window !== 'undefined') {
-    if (token) {
-      localStorage.setItem('topline_refresh_token', token);
-    } else {
-      localStorage.removeItem('topline_refresh_token');
-    }
-  }
-}
-
-function getRefreshToken(): string | null {
-  if (refreshToken) return refreshToken;
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('topline_refresh_token');
-  }
-  return null;
-}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
@@ -79,51 +57,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Check for existing session on mount
   useEffect(() => {
     const initAuth = async () => {
-      const token = getAccessToken();
-      if (token) {
-        try {
-          const user = await api.auth.me();
+      try {
+        const result = await getCurrentUser();
+        if (result.success && result.data) {
           setState({
-            user: user as User,
+            user: result.data as User,
             isLoading: false,
             isAuthenticated: true,
             error: null,
           });
-        } catch (error) {
-          // Token invalid, try refresh
-          const rToken = getRefreshToken();
-          if (rToken) {
-            try {
-              await api.auth.refresh(rToken);
-              const user = await api.auth.me();
-              setState({
-                user: user as User,
-                isLoading: false,
-                isAuthenticated: true,
-                error: null,
-              });
-            } catch {
-              // Refresh failed, clear tokens
-              setAccessToken(null);
-              setRefreshToken(null);
-              setState({
-                user: null,
-                isLoading: false,
-                isAuthenticated: false,
-                error: null,
-              });
-            }
-          } else {
-            setAccessToken(null);
-            setState({
-              user: null,
-              isLoading: false,
-              isAuthenticated: false,
-              error: null,
-            });
-          }
+        } else {
+          setState({
+            user: null,
+            isLoading: false,
+            isAuthenticated: false,
+            error: null,
+          });
         }
-      } else {
+      } catch {
         setState({
           user: null,
           isLoading: false,
@@ -139,20 +90,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     try {
-      const response = await api.auth.login({ email, password });
-      setRefreshToken(response.refreshToken);
+      const result = await loginAction({ email, password });
 
-      // Fetch full user with organization
-      const user = await api.auth.me();
+      if (!result.success) {
+        throw new Error(result.error || 'Login failed');
+      }
 
       setState({
-        user: user as User,
+        user: result.data!.user as User,
         isLoading: false,
         isAuthenticated: true,
         error: null,
       });
     } catch (error) {
-      const message = error instanceof ApiError
+      const message = error instanceof Error
         ? error.message
         : 'Login failed. Please try again.';
       setState(prev => ({
@@ -172,20 +123,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   ) => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     try {
-      const response = await api.auth.register({ email, password, name, organizationName });
-      setRefreshToken(response.refreshToken);
+      const result = await registerAction({
+        email,
+        password,
+        name,
+        organizationName,
+      });
 
-      // Fetch full user with organization
-      const user = await api.auth.me();
+      if (!result.success) {
+        throw new Error(result.error || 'Registration failed');
+      }
 
       setState({
-        user: user as User,
+        user: result.data!.user as User,
         isLoading: false,
         isAuthenticated: true,
         error: null,
       });
     } catch (error) {
-      const message = error instanceof ApiError
+      const message = error instanceof Error
         ? error.message
         : 'Registration failed. Please try again.';
       setState(prev => ({
@@ -197,9 +153,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const logout = useCallback(() => {
-    api.auth.logout();
-    setRefreshToken(null);
+  const logout = useCallback(async () => {
+    await logoutAction();
     setState({
       user: null,
       isLoading: false,
@@ -213,16 +168,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshUser = useCallback(async () => {
-    if (!getAccessToken()) return;
     try {
-      const user = await api.auth.me();
-      setState(prev => ({
-        ...prev,
-        user: user as User,
-      }));
+      const result = await getCurrentUser();
+      if (result.success && result.data) {
+        setState(prev => ({
+          ...prev,
+          user: result.data as User,
+        }));
+      } else {
+        // If refresh fails, logout
+        await logout();
+      }
     } catch {
-      // If refresh fails, logout
-      logout();
+      await logout();
     }
   }, [logout]);
 
