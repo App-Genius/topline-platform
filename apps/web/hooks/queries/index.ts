@@ -40,7 +40,19 @@ export {
   usePendingVerifications,
   useLogBehavior,
   useVerifyBehavior,
+  useBulkVerifyBehaviors,
 } from "./useBehaviors";
+
+// Dashboard
+export {
+  useDashboard,
+  useGameState,
+  useLeaderboard,
+  type GameState,
+  type DashboardKpis,
+  type LeaderboardEntry,
+  type DashboardData,
+} from "./useDashboard";
 
 // Budget
 export {

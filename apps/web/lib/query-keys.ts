@@ -107,6 +107,15 @@ export const queryKeys = {
     performance: () => [...queryKeys.insights.all, 'performance'] as const,
   },
 
+  // Dashboard
+  dashboard: {
+    all: ['dashboard'] as const,
+    stats: (days?: number) => [...queryKeys.dashboard.all, 'stats', days ?? 30] as const,
+    gameState: () => [...queryKeys.dashboard.all, 'gameState'] as const,
+    leaderboard: (days?: number) =>
+      [...queryKeys.dashboard.all, 'leaderboard', days ?? 30] as const,
+  },
+
   // Budget
   budget: {
     all: ['budget'] as const,

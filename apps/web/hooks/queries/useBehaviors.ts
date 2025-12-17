@@ -307,3 +307,24 @@ export function useVerifyBehavior() {
     },
   });
 }
+
+/**
+ * Hook for bulk verifying behavior logs
+ */
+export function useBulkVerifyBehaviors() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ ids, verified }: { ids: string[]; verified: boolean }) => {
+      // Import dynamically to avoid circular deps
+      const { bulkVerifyBehaviorLogs } = await import('@/actions/behavior-logs');
+      const result = await bulkVerifyBehaviorLogs(ids, verified);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.behaviorLogs.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+    },
+  });
+}

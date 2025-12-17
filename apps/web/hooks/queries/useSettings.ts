@@ -4,7 +4,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { queryOptions } from "@/lib/query-client";
 import { useAuth } from "@/context/AuthContext";
-import { getCurrentOrganization, updateOrganization } from "@/actions/organizations";
+import {
+  getCurrentOrganization,
+  updateOrganization,
+  getOrganizationSettings,
+  updateOrganizationSettings,
+} from "@/actions/organizations";
 
 // Types
 interface ScoreboardMetric {
@@ -83,13 +88,22 @@ export function useSettings() {
     queryFn: async (): Promise<SettingsData> => {
       // Try to get organization settings from Server Action
       try {
-        const result = await getCurrentOrganization();
+        const result = await getOrganizationSettings();
         if (result.success && result.data) {
+          const { organization, settings } = result.data;
           return {
-            ...DEFAULT_SETTINGS,
             organization: {
-              name: result.data.name,
-              industry: result.data.industry || "RESTAURANT",
+              name: organization.name,
+              industry: organization.industry || "RESTAURANT",
+            },
+            scoreboard: {
+              ...DEFAULT_SETTINGS.scoreboard,
+              ...(settings.scoreboard || {}),
+              metrics: settings.scoreboard?.metrics || DEFAULT_SETTINGS.scoreboard.metrics,
+            },
+            notifications: {
+              ...DEFAULT_SETTINGS.notifications,
+              ...(settings.notifications || {}),
             },
           };
         }
@@ -148,7 +162,7 @@ export function useUpdateSettings() {
 
   return useMutation({
     mutationFn: async (data: UpdateSettingsInput): Promise<SettingsData> => {
-      // Update organization if changed
+      // Update organization name/industry if changed
       if (data.organization) {
         const result = await updateOrganization({
           name: data.organization.name,
@@ -159,8 +173,16 @@ export function useUpdateSettings() {
         }
       }
 
-      // TODO: Add API calls for scoreboard and notifications when endpoints exist
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Update scoreboard and notification settings
+      if (data.scoreboard || data.notifications) {
+        const settingsResult = await updateOrganizationSettings({
+          scoreboard: data.scoreboard,
+          notifications: data.notifications,
+        });
+        if (!settingsResult.success) {
+          throw new Error(settingsResult.error);
+        }
+      }
 
       // Merge with current settings
       const currentSettings = queryClient.getQueryData<SettingsData>(
