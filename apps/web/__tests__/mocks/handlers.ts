@@ -98,7 +98,7 @@ export const handlers = [
   }),
 
   http.post("/api/users", async ({ request }) => {
-    const body = await request.json();
+    const body = (await request.json()) as Record<string, unknown>;
     return HttpResponse.json({ id: "new-user-id", ...body }, { status: 201 });
   }),
 
@@ -113,7 +113,7 @@ export const handlers = [
   }),
 
   http.post("/api/behaviors/log", async ({ request }) => {
-    const body = await request.json();
+    const body = (await request.json()) as Record<string, unknown>;
     return HttpResponse.json({ id: "log-id", ...body, timestamp: new Date().toISOString() });
   }),
 
@@ -123,7 +123,7 @@ export const handlers = [
   }),
 
   http.patch("/api/settings", async ({ request }) => {
-    const body = await request.json();
+    const body = (await request.json()) as Record<string, unknown>;
     return HttpResponse.json({ ...mockSettings, ...body });
   }),
 
@@ -147,10 +147,10 @@ export const handlers = [
   }),
 
   http.post("/api/briefing/complete", async ({ request }) => {
-    const body = await request.json();
+    const body = (await request.json()) as { briefingId?: string; attendeeIds?: string[] };
     return HttpResponse.json({
-      briefingId: body.briefingId,
-      attendeeIds: body.attendeeIds,
+      briefingId: body.briefingId ?? 'mock-briefing-id',
+      attendeeIds: body.attendeeIds ?? [],
       completedAt: new Date().toISOString(),
     });
   }),

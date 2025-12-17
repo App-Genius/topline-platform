@@ -301,6 +301,101 @@ Real LLM tests run nightly - they validate actual AI integration works.
 
 ---
 
+## Testing Infrastructure
+
+### Test Setup (`__tests__/setup.ts`)
+
+The test setup file configures:
+
+1. **Jest-DOM Matchers** - Extended assertions for DOM testing
+2. **MSW Server** - Mock Service Worker for HTTP request interception
+3. **Global Mocks** - Browser APIs (matchMedia, ResizeObserver, IntersectionObserver)
+4. **AI Module Mocks** - OpenRouter/OpenAI client mocking
+5. **Server Action Mocks** - All Server Actions mocked with realistic data
+
+### Mocking Structure
+
+```
+__tests__/
+├── setup.ts              # Global test setup (runs before all tests)
+├── mocks/
+│   ├── server.ts         # MSW server instance
+│   ├── handlers.ts       # HTTP route handlers for MSW
+│   └── ai.ts             # AI client mock utilities
+└── utils/
+    └── test-wrapper.tsx  # React Query + Auth provider wrapper
+```
+
+### AI Client Mocking
+
+The OpenRouter client (which uses OpenAI SDK) is mocked to prevent browser detection errors:
+
+```typescript
+// In setup.ts - mocks the openai package
+vi.mock("openai", () => ({
+  default: vi.fn().mockImplementation(() => ({
+    chat: { completions: { create: vi.fn().mockResolvedValue({...}) } },
+  })),
+}));
+
+// Also mocks @/lib/ai/client with all exported functions
+vi.mock("@/lib/ai/client", () => ({
+  openrouter: {...},
+  isConfigured: vi.fn().mockReturnValue(true),
+  generateCompletion: vi.fn().mockResolvedValue("Mock AI response"),
+  generateStructured: vi.fn().mockResolvedValue({ success: true }),
+}));
+```
+
+### Server Action Mocking
+
+Hooks use Server Actions (not HTTP), so they're mocked directly:
+
+```typescript
+vi.mock("@/actions", () => ({
+  getTodaysBriefing: vi.fn().mockResolvedValue({
+    success: true,
+    data: { id: "briefing-2024-01-15", ... },
+  }),
+  // ... all other actions mocked
+}));
+```
+
+### Writing Tests
+
+**For pure functions (lib/core/):**
+```typescript
+import { calculateAverageCheck } from '@/lib/core';
+
+it('calculates average check', () => {
+  expect(calculateAverageCheck(5000, 100)).toBe(50);
+});
+```
+
+**For hooks:**
+```typescript
+import { renderHook, waitFor } from '@testing-library/react';
+import { useBriefing } from '@/hooks/queries';
+import { createWrapper } from '../../utils/test-wrapper';
+
+it('fetches briefing data', async () => {
+  const { result } = renderHook(() => useBriefing(), {
+    wrapper: createWrapper(),
+  });
+  await waitFor(() => expect(result.current.isSuccess).toBe(true));
+});
+```
+
+### Current Test Status
+
+| Category | Tests | Coverage |
+|----------|-------|----------|
+| Core Library (lib/core/) | 391 | 98.99% |
+| Hook Tests | 32 | Mocked |
+| **Total** | **423** | **All passing** |
+
+---
+
 ## Code Architecture Rules
 
 ### Frontend (apps/web/)
@@ -324,6 +419,39 @@ See `apps/web/CLAUDE.md` for detailed rules. Key points:
 1. **Pure functions** - Calculations, transformations
 2. **Type definitions** - Shared TypeScript types
 3. **Schemas** - Zod schemas for validation
+
+### Core Library (apps/web/lib/core/)
+
+The `lib/core/` module contains **all pure business logic** extracted from Server Actions. This enables 95%+ test coverage and clean separation of concerns.
+
+**Modules:**
+
+| Module | Purpose | Coverage |
+|--------|---------|----------|
+| `kpi.ts` | KPI calculations (avg check, trends, variance, margins) | 100% |
+| `game-state.ts` | Game state logic (winning/losing/celebrating) | 96.55% |
+| `leaderboard.ts` | Leaderboard ranking algorithms | 100% |
+| `statistics.ts` | Statistics (streaks, aggregations, standard deviation) | 100% |
+| `rbac.ts` | Role-based access control logic | 97.56% |
+| `date-utils.ts` | Date manipulation utilities | 100% |
+| `utils.ts` | Shared utilities (sanitization, validation, formatting) | 97.53% |
+
+**Usage:**
+```typescript
+import {
+  calculateAverageCheck,
+  determineGameState,
+  buildLeaderboard,
+  isManagerRole,
+  formatCurrency,
+} from '@/lib/core';
+```
+
+**Key Design Principles:**
+- All functions are **pure** (no side effects, no database calls)
+- Functions take explicit inputs and return explicit outputs
+- Comprehensive JSDoc documentation on every export
+- 95%+ test coverage with extensive edge case tests
 
 ---
 

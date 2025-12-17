@@ -41,6 +41,7 @@ export {
   getBehaviorLogs,
   createBehaviorLog,
   verifyBehaviorLog,
+  bulkVerifyBehaviorLogs,
   getPendingLogs,
   deleteBehaviorLog,
 } from './behavior-logs'
@@ -71,3 +72,12 @@ export {
   listQuestionnaireSubmissions,
   markSubmissionContacted,
 } from './questionnaire'
+
+// Briefing actions
+export {
+  getTodaysBriefing,
+  completeBriefing,
+  uploadAttendancePhoto,
+  getBriefingHistory,
+  getTeamOnShift,
+} from './briefings'

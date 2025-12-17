@@ -1,5 +1,12 @@
-import { setupServer } from "msw/node";
-import { handlers } from "./handlers";
+/**
+ * MSW Server Setup for Testing
+ *
+ * Creates a mock service worker server for intercepting
+ * API requests during tests.
+ */
 
-// Setup requests interception using the given handlers
+import { setupServer } from 'msw/node';
+import { handlers } from './handlers';
+
+// Create the server with default handlers
 export const server = setupServer(...handlers);

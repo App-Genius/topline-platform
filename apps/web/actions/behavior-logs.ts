@@ -256,6 +256,61 @@ export async function getPendingLogs(params?: {
 }
 
 /**
+ * Bulk verify multiple behavior logs (Manager/Admin only)
+ */
+export async function bulkVerifyBehaviorLogs(
+  ids: string[],
+  verified: boolean
+): Promise<ActionResult<{ count: number }>> {
+  try {
+    await requireRole('MANAGER', 'ADMIN')
+    const session = await requireAuth()
+
+    if (ids.length === 0) {
+      return { success: false, error: 'No logs provided' }
+    }
+
+    // Verify all logs belong to the organization
+    const logs = await prisma.behaviorLog.findMany({
+      where: {
+        id: { in: ids },
+        user: { organizationId: session.orgId },
+      },
+      select: { id: true },
+    })
+
+    if (logs.length !== ids.length) {
+      return { success: false, error: 'Some behavior logs not found or not accessible' }
+    }
+
+    // Update all logs
+    const result = await prisma.behaviorLog.updateMany({
+      where: {
+        id: { in: ids },
+        user: { organizationId: session.orgId },
+      },
+      data: {
+        verified,
+        verifiedById: verified ? session.userId : null,
+        verifiedAt: verified ? new Date() : null,
+      },
+    })
+
+    revalidatePath('/manager')
+    revalidatePath('/manager/verification')
+    revalidatePath('/staff')
+    revalidatePath('/scoreboard')
+
+    return { success: true, data: { count: result.count } }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to bulk verify behavior logs',
+    }
+  }
+}
+
+/**
  * Delete a behavior log
  * Staff can only delete their own unverified logs
  * Managers/Admins can delete any log

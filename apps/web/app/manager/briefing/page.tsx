@@ -205,7 +205,7 @@ export default function DailyBriefingPage() {
             </Link>
             <div>
               <h1 className="text-lg font-bold text-slate-900">Daily Briefing</h1>
-              <p className="text-sm text-slate-500">{briefing.date}</p>
+              <p className="text-sm text-slate-500">{briefing.dateFormatted}</p>
             </div>
           </div>
           <div className="flex items-center gap-2" aria-live="polite">
