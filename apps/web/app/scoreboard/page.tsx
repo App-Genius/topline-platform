@@ -1,51 +1,53 @@
 "use client";
 
 import React from 'react';
-import { useApp } from '@/context/AppContext';
-import { Trophy, TrendingUp, TrendingDown, AlertCircle, Star } from 'lucide-react';
+import { useDashboard } from '@/hooks/queries/useDashboard';
+import { Trophy, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function ScoreboardPage() {
-  const { staff, entries, currentDate, benchmarks, gameState } = useApp();
+  const { data, isLoading, error } = useDashboard();
 
-  // Get today's entry
-  const todayEntry = entries.find(e => e.date === currentDate);
-  const dailyRevenue = todayEntry?.totalRevenue || 0;
-  const dailyTarget = Math.round(benchmarks.lastYearRevenue / benchmarks.daysOpen);
-  const percentOfGoal = Math.round((dailyRevenue / dailyTarget) * 100);
-  
-  const isWinning = dailyRevenue >= dailyTarget;
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
+          <p className="text-slate-400">Loading scoreboard...</p>
+        </div>
+      </div>
+    );
+  }
 
-  // Calculate Team Satisfaction (Reputation)
-  const dailyReviews = todayEntry?.reviews || [];
-  const currentRating = dailyReviews.length > 0
-    ? dailyReviews.reduce((sum, r) => sum + r.rating, 0) / dailyReviews.length
-    : benchmarks.baselineRating;
+  // Error state
+  if (error || !data) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-rose-400 text-lg">Failed to load scoreboard</p>
+          <p className="text-slate-500 mt-2">{error?.message || 'Please try again'}</p>
+        </div>
+      </div>
+    );
+  }
 
-  // Process staff data for display
-  const staffPerformance = staff
-    .filter(s => s.role === 'staff')
-    .map(s => {
-      const stats = todayEntry?.staffStats.find(stat => stat.staffId === s.id);
-      const behaviorCount = stats 
-        ? Object.values(stats.behaviorCounts).reduce((a, b) => a + b, 0) 
-        : 0;
-      
-      // Mock Average Check Calculation for the scoreboard if not explicitly tracked per person yet
-      // In a real app, this comes from the POS integration or manual entry
-      // We'll simulate a variation based on behavior count to show the correlation
-      const baseCheck = benchmarks.baselineAvgCheck; 
-      const boost = behaviorCount * 1.5; // Behaviors drive check size!
-      const simulatedAvgCheck = stats?.avgCheck || (baseCheck + boost + (Math.random() * 5 - 2.5));
+  const { gameState, kpis, leaderboard } = data;
 
-      return {
-        ...s,
-        behaviorCount,
-        avgCheck: simulatedAvgCheck,
-        revenue: stats?.revenue || 0
-      };
-    })
-    .sort((a, b) => b.avgCheck - a.avgCheck); // Sort by Lag Measure (Outcome)
+  // Determine if winning based on game state
+  const isWinning = gameState.status === 'winning' || gameState.status === 'celebrating';
+  const dailyRevenue = kpis.revenue.current;
+  const dailyTarget = kpis.revenue.target;
+  const percentOfGoal = dailyTarget > 0 ? Math.round((dailyRevenue / dailyTarget) * 100) : 0;
+
+  // Process leaderboard for display
+  const staffPerformance = leaderboard.map((entry) => ({
+    id: entry.userId,
+    name: entry.userName,
+    avatar: entry.avatar || entry.userName.slice(0, 2).toUpperCase(),
+    score: entry.score,
+    rank: entry.rank,
+  }));
 
   return (
     <div className="min-h-screen bg-slate-950 text-white p-6 pb-24 font-sans selection:bg-blue-500 selection:text-white">
@@ -84,16 +86,19 @@ export default function ScoreboardPage() {
           </div>
           <div className="flex items-end gap-4">
             <div className="text-5xl font-black text-blue-400">
-              {staffPerformance.reduce((acc, s) => acc + s.behaviorCount, 0)}
+              {kpis.behaviors.today}
             </div>
             <div className="text-slate-500 pb-2 text-sm font-medium">
-              Total Actions Taken
+              Today&apos;s Actions
             </div>
           </div>
+          <div className="text-slate-600 text-xs mt-2">
+            Avg: {kpis.behaviors.average}/day
+          </div>
           <div className="w-full bg-slate-800 h-2 mt-4 rounded-full overflow-hidden">
-            <div 
-              className="bg-blue-500 h-full rounded-full" 
-              style={{ width: `${Math.min(staffPerformance.reduce((acc, s) => acc + s.behaviorCount, 0) * 2, 100)}%` }}
+            <div
+              className="bg-blue-500 h-full rounded-full transition-all"
+              style={{ width: `${Math.min((kpis.behaviors.today / Math.max(kpis.behaviors.average, 1)) * 50, 100)}%` }}
             ></div>
           </div>
         </div>
@@ -103,20 +108,33 @@ export default function ScoreboardPage() {
           <div className="absolute -right-4 -bottom-4 text-yellow-500/10">
             <Trophy size={120} />
           </div>
-          <div className="h-20 w-20 rounded-full bg-yellow-500 flex items-center justify-center text-yellow-950 text-2xl font-bold border-4 border-yellow-600/30 shadow-lg z-10">
-            {staffPerformance[0]?.avatar}
-          </div>
-          <div className="z-10">
-            <div className="text-yellow-500 text-xs font-bold uppercase tracking-widest mb-1">
-              Current Leader
+          {staffPerformance.length > 0 ? (
+            <>
+              <div className="h-20 w-20 rounded-full bg-yellow-500 flex items-center justify-center text-yellow-950 text-2xl font-bold border-4 border-yellow-600/30 shadow-lg z-10">
+                {staffPerformance[0]?.avatar}
+              </div>
+              <div className="z-10">
+                <div className="text-yellow-500 text-xs font-bold uppercase tracking-widest mb-1">
+                  Current Leader
+                </div>
+                <div className="text-3xl font-bold text-white">
+                  {staffPerformance[0]?.name}
+                </div>
+                <div className="text-yellow-200/80 text-sm mt-1">
+                  {staffPerformance[0]?.score.toLocaleString()} points
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="z-10">
+              <div className="text-yellow-500 text-xs font-bold uppercase tracking-widest mb-1">
+                Current Leader
+              </div>
+              <div className="text-xl font-bold text-slate-400">
+                No behaviors logged yet
+              </div>
             </div>
-            <div className="text-3xl font-bold text-white">
-              {staffPerformance[0]?.name}
-            </div>
-            <div className="text-yellow-200/80 text-sm mt-1">
-              ${staffPerformance[0]?.avgCheck.toFixed(2)} Avg Check
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -124,49 +142,85 @@ export default function ScoreboardPage() {
       <div className="bg-slate-900/50 rounded-3xl border border-slate-800 overflow-hidden">
         <div className="grid grid-cols-12 gap-4 p-6 text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-slate-800">
           <div className="col-span-1 text-center">Rank</div>
-          <div className="col-span-4">Team Member</div>
-          <div className="col-span-3 text-center">Behaviors (Lead)</div>
-          <div className="col-span-4 text-right">Avg Check (Lag)</div>
+          <div className="col-span-7">Team Member</div>
+          <div className="col-span-4 text-right">Points</div>
         </div>
 
-        <div className="divide-y divide-slate-800">
-          {staffPerformance.map((member, index) => (
-            <div key={member.id} className="grid grid-cols-12 gap-4 p-6 items-center hover:bg-white/5 transition-colors">
-              <div className="col-span-1 flex justify-center">
-                <div className={clsx(
-                  "h-8 w-8 rounded-full flex items-center justify-center font-bold text-sm",
-                  index === 0 ? "bg-yellow-500 text-black" :
-                  index === 1 ? "bg-slate-300 text-black" :
-                  index === 2 ? "bg-orange-700 text-white" :
-                  "text-slate-500 bg-slate-800"
-                )}>
-                  {index + 1}
+        {staffPerformance.length > 0 ? (
+          <div className="divide-y divide-slate-800">
+            {staffPerformance.map((member) => (
+              <div key={member.id} className="grid grid-cols-12 gap-4 p-6 items-center hover:bg-white/5 transition-colors">
+                <div className="col-span-1 flex justify-center">
+                  <div className={clsx(
+                    "h-8 w-8 rounded-full flex items-center justify-center font-bold text-sm",
+                    member.rank === 1 ? "bg-yellow-500 text-black" :
+                    member.rank === 2 ? "bg-slate-300 text-black" :
+                    member.rank === 3 ? "bg-orange-700 text-white" :
+                    "text-slate-500 bg-slate-800"
+                  )}>
+                    {member.rank}
+                  </div>
                 </div>
-              </div>
-              
-              <div className="col-span-4 flex items-center gap-4">
-                <div className="h-10 w-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 font-bold text-xs">
-                  {member.avatar}
-                </div>
-                <span className="font-bold text-lg">{member.name}</span>
-              </div>
 
-              <div className="col-span-3 flex flex-col items-center justify-center">
-                <span className="text-2xl font-bold text-blue-400">{member.behaviorCount}</span>
-                <span className="text-[10px] text-slate-600 uppercase">Actions</span>
-              </div>
+                <div className="col-span-7 flex items-center gap-4">
+                  <div className="h-10 w-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 font-bold text-xs">
+                    {member.avatar}
+                  </div>
+                  <span className="font-bold text-lg">{member.name}</span>
+                </div>
 
-              <div className="col-span-4 text-right">
-                <div className="text-2xl font-mono font-bold text-emerald-400">
-                  ${member.avgCheck.toFixed(2)}
-                </div>
-                <div className="flex items-center justify-end gap-1 text-[10px] text-emerald-600/80">
-                  <TrendingUp size={10} />
-                  <span>vs Baseline ${benchmarks.baselineAvgCheck.toFixed(0)}</span>
+                <div className="col-span-4 text-right">
+                  <div className="text-2xl font-mono font-bold text-emerald-400">
+                    {member.score.toLocaleString()}
+                  </div>
+                  <div className="text-[10px] text-slate-600 uppercase">
+                    points earned
+                  </div>
                 </div>
               </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-12 text-center">
+            <div className="text-slate-500 text-lg">No behaviors logged yet</div>
+            <p className="text-slate-600 text-sm mt-2">
+              Start tracking behaviors to see the leaderboard
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Game Progress Footer */}
+      <div className="mt-8 rounded-2xl bg-slate-900 border border-slate-800 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <div className="text-slate-400 text-xs font-bold uppercase tracking-widest">
+              Season Progress
             </div>
-          ))}
+            <div className="text-white text-lg font-bold mt-1">
+              {gameState.percentComplete}% of annual goal
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-slate-400 text-xs">
+              {gameState.daysRemaining} days remaining
+            </div>
+            <div className="text-2xl font-bold text-white">
+              ${gameState.currentScore.toLocaleString()}
+            </div>
+            <div className="text-slate-500 text-xs">
+              of ${gameState.targetScore.toLocaleString()} target
+            </div>
+          </div>
+        </div>
+        <div className="w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+          <div
+            className={clsx(
+              "h-full rounded-full transition-all",
+              isWinning ? "bg-emerald-500" : "bg-rose-500"
+            )}
+            style={{ width: `${Math.min(gameState.percentComplete, 100)}%` }}
+          ></div>
         </div>
       </div>
     </div>

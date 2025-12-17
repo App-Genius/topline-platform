@@ -2,36 +2,46 @@
 
 import React, { useMemo, useState } from 'react';
 import { useApp } from '@/context/AppContext';
-import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+import { useDashboard } from '@/hooks/queries/useDashboard';
+import { useAuth } from '@/context/AuthContext';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   AreaChart, Area, ComposedChart
 } from 'recharts';
-import { 
-  ArrowUpRight, ArrowDownRight, AlertTriangle, TrendingUp, 
-  BrainCircuit, DollarSign, Users, Star, CheckCircle, MessageSquare
+import {
+  ArrowUpRight, ArrowDownRight, AlertTriangle, TrendingUp,
+  BrainCircuit, DollarSign, Users, Star, CheckCircle, MessageSquare, Loader2
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function AdminPage() {
+  const { isAuthenticated } = useAuth();
   const { entries, benchmarks, gameState } = useApp();
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
 
-  // Prepare data for charts
+  // Fetch real dashboard data when authenticated
+  const timeRangeDays = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
+  const { data: dashboardData, isLoading, error } = useDashboard(timeRangeDays);
+
+  // Use real data when available, fallback to mock data for demo mode
+  const useRealData = isAuthenticated && dashboardData && !error;
+
+  // Prepare data for charts from mock data (used when not authenticated)
   const chartData = useMemo(() => {
     const sorted = [...entries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
+
     return sorted.map(entry => {
       const totalBehaviors = entry.staffStats.reduce((acc, stat) => {
         return acc + Object.values(stat.behaviorCounts).reduce((sum, val) => sum + val, 0);
       }, 0);
 
-      const avgCheck = entry.totalCovers > 0 
-        ? entry.totalRevenue / entry.totalCovers 
+      const avgCheck = entry.totalCovers > 0
+        ? entry.totalRevenue / entry.totalCovers
         : 0;
 
       // Calculate average review score if present, else mock it based on rev
       const dailyReviews = entry.reviews || [];
-      const avgReview = dailyReviews.length > 0 
+      const avgReview = dailyReviews.length > 0
         ? dailyReviews.reduce((sum, r) => sum + r.rating, 0) / dailyReviews.length
         : 0;
 
@@ -48,15 +58,33 @@ export default function AdminPage() {
     });
   }, [entries, benchmarks]);
 
-  // KPI Calculations
+  // KPI Calculations - use real data when available
   const currentData = chartData[chartData.length - 1] || {};
-  const totalRevenueLast30 = chartData.reduce((acc, curr) => acc + (curr.revenue || 0), 0);
-  const avgCheckTrend = chartData.length > 1 
-    ? ((currentData.avgCheck - chartData[0].avgCheck) / chartData[0].avgCheck) * 100
-    : 0;
+  const totalRevenueLast30 = useRealData
+    ? dashboardData.kpis.revenue.current
+    : chartData.reduce((acc, curr) => acc + (curr.revenue || 0), 0);
+
+  const avgCheckValue = useRealData
+    ? dashboardData.kpis.avgCheck.current
+    : currentData.avgCheck || 0;
+
+  const avgCheckTrend = useRealData
+    ? dashboardData.kpis.avgCheck.trend
+    : chartData.length > 1
+      ? ((currentData.avgCheck - chartData[0].avgCheck) / chartData[0].avgCheck) * 100
+      : 0;
+
+  const baselineAvgCheck = useRealData
+    ? dashboardData.kpis.avgCheck.baseline
+    : benchmarks.baselineAvgCheck;
 
   // Quality Metric
-  const currentRating = currentData.avgReview || 4.2;
+  const currentRating = useRealData
+    ? dashboardData.kpis.rating.current
+    : currentData.avgReview || 4.2;
+  const baselineRating = useRealData
+    ? dashboardData.kpis.rating.baseline
+    : benchmarks.baselineRating;
   const recentReviews = currentData.reviews || [];
 
   return (
@@ -92,40 +120,44 @@ export default function AdminPage() {
         
         {/* 1. High-Level KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard 
+          <KpiCard
             title="Total Revenue (MTD)"
             value={`$${totalRevenueLast30.toLocaleString()}`}
-            trend="+12%"
-            trendUp={true}
+            trend={useRealData ? `${dashboardData.kpis.revenue.trend > 0 ? '+' : ''}${dashboardData.kpis.revenue.trend}%` : '+12%'}
+            trendUp={useRealData ? dashboardData.kpis.revenue.trend >= 0 : true}
             icon={DollarSign}
             color="emerald"
+            isLoading={isLoading}
           />
-          <KpiCard 
+          <KpiCard
             title="Avg Check Size"
-            value={`$${currentData.avgCheck?.toFixed(2)}`}
-            trend={`${avgCheckTrend.toFixed(1)}%`}
+            value={`$${avgCheckValue.toFixed(2)}`}
+            trend={`${avgCheckTrend > 0 ? '+' : ''}${avgCheckTrend.toFixed(1)}%`}
             trendUp={avgCheckTrend > 0}
             icon={TrendingUp}
             color="blue"
-            subValue={`vs Baseline $${benchmarks.baselineAvgCheck.toFixed(0)}`}
+            subValue={`vs Baseline $${baselineAvgCheck.toFixed(0)}`}
+            isLoading={isLoading}
           />
-          <KpiCard 
+          <KpiCard
             title="Customer Voice"
             value={currentRating.toFixed(1)}
             subLabel="Google & TripAdvisor"
-            trend="Stable"
-            trendUp={currentRating >= 4.0}
+            trend={currentRating >= baselineRating ? 'Above Target' : 'Below Target'}
+            trendUp={currentRating >= baselineRating}
             icon={Star}
             color="yellow"
+            isLoading={isLoading}
           />
-          <KpiCard 
+          <KpiCard
             title="Behavior ROI"
-            value="High"
-            subLabel="Correlation Strength"
-            trend="Optimized"
+            value={useRealData ? (dashboardData.kpis.behaviors.today > dashboardData.kpis.behaviors.average ? 'High' : 'Normal') : 'High'}
+            subLabel={useRealData ? `${dashboardData.kpis.behaviors.today} today` : 'Correlation Strength'}
+            trend={useRealData ? `Avg ${dashboardData.kpis.behaviors.average}/day` : 'Optimized'}
             trendUp={true}
             icon={BrainCircuit}
             color="purple"
+            isLoading={isLoading}
           />
         </div>
 
@@ -203,13 +235,13 @@ export default function AdminPage() {
                      </span>
                    </div>
                    <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden relative">
-                     <div className="absolute top-0 bottom-0 w-0.5 bg-slate-400 z-10" style={{left: `${(benchmarks.baselineRating / 5) * 100}%`}}></div>
-                     <div 
-                        className={clsx("h-full rounded-full transition-all", currentRating < 3.5 ? "bg-rose-500" : "bg-blue-500")} 
+                     <div className="absolute top-0 bottom-0 w-0.5 bg-slate-400 z-10" style={{left: `${(baselineRating / 5) * 100}%`}}></div>
+                     <div
+                        className={clsx("h-full rounded-full transition-all", currentRating < 3.5 ? "bg-rose-500" : "bg-blue-500")}
                         style={{width: `${(currentRating / 5) * 100}%`}}
                      ></div>
                    </div>
-                   <p className="text-[10px] text-slate-400 mt-1 text-right">Target: {benchmarks.baselineRating.toFixed(1)}</p>
+                   <p className="text-[10px] text-slate-400 mt-1 text-right">Target: {baselineRating.toFixed(1)}</p>
                  </div>
 
                  {/* Risk Flag */}
@@ -279,7 +311,19 @@ export default function AdminPage() {
   );
 }
 
-function KpiCard({ title, value, trend, trendUp, icon: Icon, color, subValue, subLabel }: any) {
+interface KpiCardProps {
+  title: string;
+  value: string;
+  trend: string;
+  trendUp: boolean;
+  icon: React.ComponentType<{ size?: number }>;
+  color: 'emerald' | 'blue' | 'indigo' | 'purple' | 'yellow';
+  subValue?: string;
+  subLabel?: string;
+  isLoading?: boolean;
+}
+
+function KpiCard({ title, value, trend, trendUp, icon: Icon, color, subValue, subLabel, isLoading }: KpiCardProps) {
   const colors = {
     emerald: "bg-emerald-50 text-emerald-600",
     blue: "bg-blue-50 text-blue-600",
@@ -293,23 +337,37 @@ function KpiCard({ title, value, trend, trendUp, icon: Icon, color, subValue, su
       <div className="flex justify-between items-start">
         <div>
           <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">{title}</p>
-          <h3 className="text-3xl font-black text-slate-900 tracking-tight">{value}</h3>
-          {subValue && <p className="text-xs text-slate-400 mt-1">{subValue}</p>}
-          {subLabel && <p className="text-xs text-slate-400 mt-1">{subLabel}</p>}
+          {isLoading ? (
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            </div>
+          ) : (
+            <>
+              <h3 className="text-3xl font-black text-slate-900 tracking-tight">{value}</h3>
+              {subValue && <p className="text-xs text-slate-400 mt-1">{subValue}</p>}
+              {subLabel && <p className="text-xs text-slate-400 mt-1">{subLabel}</p>}
+            </>
+          )}
         </div>
-        <div className={clsx("p-3 rounded-lg", colors[color as keyof typeof colors])}>
+        <div className={clsx("p-3 rounded-lg", colors[color])}>
           <Icon size={20} />
         </div>
       </div>
       <div className="flex items-center gap-2 mt-2">
-        <div className={clsx(
-          "px-2 py-0.5 rounded text-xs font-bold flex items-center gap-1",
-          trendUp ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
-        )}>
-          {trendUp ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-          {trend}
-        </div>
-        <span className="text-xs text-slate-400">vs last 30 days</span>
+        {isLoading ? (
+          <div className="h-5 w-20 bg-slate-100 rounded animate-pulse" />
+        ) : (
+          <>
+            <div className={clsx(
+              "px-2 py-0.5 rounded text-xs font-bold flex items-center gap-1",
+              trendUp ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
+            )}>
+              {trendUp ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+              {trend}
+            </div>
+            <span className="text-xs text-slate-400">vs last 30 days</span>
+          </>
+        )}
       </div>
     </div>
   );

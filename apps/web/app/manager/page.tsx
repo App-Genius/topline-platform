@@ -63,8 +63,18 @@ export default function ManagerPage() {
         </Link>
       </div>
 
+      {/* Verification Queue Link */}
+      <div className="bg-amber-50 text-amber-900 px-6 py-3 flex justify-between items-center sticky top-[146px] z-10 border-b border-amber-200">
+        <div className="text-sm font-medium">
+          <span className="text-amber-600">Pending behaviors?</span> Review and verify staff behavior logs in bulk.
+        </div>
+        <Link href="/manager/verification" className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors">
+          Verification Queue <ArrowRight size={14} />
+        </Link>
+      </div>
+
       {/* Weekly Strategy Link */}
-      <div className="bg-slate-900 text-white px-6 py-3 flex justify-between items-center sticky top-[146px] z-10">
+      <div className="bg-slate-900 text-white px-6 py-3 flex justify-between items-center sticky top-[219px] z-10">
         <div className="text-sm font-medium">
           <span className="text-slate-400">End of Week?</span> Review performance and set next week&apos;s behaviors.
         </div>
