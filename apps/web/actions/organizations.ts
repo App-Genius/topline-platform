@@ -233,6 +233,127 @@ export async function upsertBenchmark(data: {
 }
 
 /**
+ * Update organization settings (Admin only)
+ * Settings include scoreboard, notifications, and other configurable options
+ */
+export async function updateOrganizationSettings(settings: {
+  scoreboard?: {
+    metrics?: Array<{
+      id: string
+      name: string
+      description: string
+      enabled: boolean
+    }>
+    refreshInterval?: number
+    showLeaderboard?: boolean
+    anonymizeNames?: boolean
+    theme?: 'dark' | 'light'
+  }
+  notifications?: {
+    emailAlerts?: boolean
+    budgetWarnings?: boolean
+    performanceUpdates?: boolean
+  }
+}): Promise<ActionResult<{ settings: unknown }>> {
+  try {
+    await requireRole('ADMIN', 'MANAGER')
+    const session = await requireAuth()
+
+    // Get current organization settings
+    const org = await prisma.organization.findUnique({
+      where: { id: session.orgId },
+      select: { settings: true },
+    })
+
+    if (!org) {
+      return { success: false, error: 'Organization not found' }
+    }
+
+    // Merge new settings with existing settings
+    const currentSettings = (org.settings as Record<string, unknown>) || {}
+    const newSettings = {
+      ...currentSettings,
+      ...(settings.scoreboard ? { scoreboard: { ...(currentSettings.scoreboard as object || {}), ...settings.scoreboard } } : {}),
+      ...(settings.notifications ? { notifications: { ...(currentSettings.notifications as object || {}), ...settings.notifications } } : {}),
+    }
+
+    // Update organization with new settings
+    const updated = await prisma.organization.update({
+      where: { id: session.orgId },
+      data: { settings: newSettings },
+      select: { settings: true },
+    })
+
+    revalidatePath('/settings')
+    revalidatePath('/scoreboard')
+
+    return { success: true, data: { settings: updated.settings } }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update settings',
+    }
+  }
+}
+
+/**
+ * Get organization settings
+ */
+export async function getOrganizationSettings(): Promise<
+  ActionResult<{
+    organization: { name: string; industry: string }
+    settings: {
+      scoreboard?: {
+        metrics?: Array<{
+          id: string
+          name: string
+          description: string
+          enabled: boolean
+        }>
+        refreshInterval?: number
+        showLeaderboard?: boolean
+        anonymizeNames?: boolean
+        theme?: 'dark' | 'light'
+      }
+      notifications?: {
+        emailAlerts?: boolean
+        budgetWarnings?: boolean
+        performanceUpdates?: boolean
+      }
+    }
+  }>
+> {
+  try {
+    const session = await requireAuth()
+
+    const org = await prisma.organization.findUnique({
+      where: { id: session.orgId },
+      select: { name: true, industry: true, settings: true },
+    })
+
+    if (!org) {
+      return { success: false, error: 'Organization not found' }
+    }
+
+    return {
+      success: true,
+      data: {
+        organization: {
+          name: org.name,
+          industry: org.industry,
+        },
+        settings: (org.settings as Record<string, unknown>) || {},
+      },
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch settings',
+    }
+  }
+}
+
+/**
  * Get dashboard data
  */
 export async function getDashboard(

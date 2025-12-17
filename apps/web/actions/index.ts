@@ -63,6 +63,8 @@ export {
   getBenchmarks,
   upsertBenchmark,
   getDashboard,
+  updateOrganizationSettings,
+  getOrganizationSettings,
 } from './organizations'
 
 // Questionnaire actions
@@ -81,3 +83,10 @@ export {
   getBriefingHistory,
   getTeamOnShift,
 } from './briefings'
+
+// AI actions
+export {
+  getAIStatus,
+  suggestBehaviors,
+  createBehaviorFromSuggestion,
+} from './ai'
