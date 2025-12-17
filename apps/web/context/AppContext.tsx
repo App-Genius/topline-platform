@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 // --- Types ---
 
@@ -113,68 +113,77 @@ const INITIAL_BENCHMARK: BenchmarkData = {
   baselineRating: 4.2,
 };
 
-// Generate some fake history for charts
+// Seeded random number generator for deterministic values
+// This ensures SSR and client render the same initial values
+const seededRandom = (seed: number) => {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+};
+
+// Generate some fake history for charts - uses deterministic seed
 const generateHistory = (): DailyEntry[] => {
   const history: DailyEntry[] = [];
   const baseDate = new Date('2023-11-01');
-  const todayStr = new Date().toISOString().split('T')[0];
-  
+  // Use a fixed date string for initial render to avoid hydration issues
+  const todayStr = '2023-11-21'; // Fixed for SSR consistency
+
   // Create past history (20 days)
   for (let i = 0; i < 20; i++) {
     const date = new Date(baseDate);
     date.setDate(date.getDate() + i);
     const dateStr = date.toISOString().split('T')[0];
-    
-    // Randomize performance to show trends
+
+    // Use seeded random for deterministic values
+    const seed = i * 1000;
     const isWeekend = date.getDay() === 0 || date.getDay() === 6;
     const baseRev = isWeekend ? 4000 : 2500;
-    const randomVar = Math.random() * 1000;
+    const randomVar = seededRandom(seed) * 1000;
     const totalRevenue = Math.floor(baseRev + randomVar);
-    const totalCovers = Math.floor(totalRevenue / (50 + (Math.random() * 10))); 
-    
+    const totalCovers = Math.floor(totalRevenue / (50 + (seededRandom(seed + 1) * 10)));
+
     history.push({
       date: dateStr,
       totalRevenue,
       totalCovers,
       verified: true,
-      reviews: [], // History reviews could be added if needed
-      staffStats: INITIAL_STAFF.filter(s => s.role === 'staff').map(s => ({
+      reviews: [],
+      staffStats: INITIAL_STAFF.filter(s => s.role === 'staff').map((s, sIdx) => ({
         staffId: s.id,
         behaviorCounts: {
-          'b1': Math.floor(Math.random() * 5),
-          'b2': Math.floor(Math.random() * 8),
+          'b1': Math.floor(seededRandom(seed + sIdx * 10) * 5),
+          'b2': Math.floor(seededRandom(seed + sIdx * 10 + 1) * 8),
         },
-        revenue: Math.floor(totalRevenue / 3), 
-        logs: [] // Empty logs for history to save memory
+        revenue: Math.floor(totalRevenue / 3),
+        logs: []
       }))
     });
   }
 
-  // --- Create "Today" Entry with DETAILED logs for Manager Audit ---
-  // This ensures the Manager View is not empty on first load.
-  const todayRevenue = 1250; // Mid-shift
+  // Create "Today" Entry with DETAILED logs for Manager Audit
+  const todayRevenue = 1250;
   const todayCovers = 25;
-  
+
   history.push({
     date: todayStr,
     totalRevenue: todayRevenue,
     totalCovers: todayCovers,
     verified: false,
     reviews: [
-      { id: 'r1', source: 'google', rating: 5, text: "Amazing service! The wine suggestion was perfect.", date: new Date().toISOString() },
-      { id: 'r2', source: 'tripadvisor', rating: 4, text: "Good food, slightly slow but friendly.", date: new Date().toISOString() }
+      { id: 'r1', source: 'google', rating: 5, text: "Amazing service! The wine suggestion was perfect.", date: '2023-11-21T12:00:00.000Z' },
+      { id: 'r2', source: 'tripadvisor', rating: 4, text: "Good food, slightly slow but friendly.", date: '2023-11-21T14:00:00.000Z' }
     ],
-    staffStats: INITIAL_STAFF.filter(s => s.role === 'staff').map(s => {
-      const count = Math.floor(Math.random() * 4) + 2; // 2-6 logs each
+    staffStats: INITIAL_STAFF.filter(s => s.role === 'staff').map((s, sIdx) => {
+      const baseSeed = 9000 + sIdx * 100;
+      const count = Math.floor(seededRandom(baseSeed) * 4) + 2;
       const logs = Array(count).fill(null).map((_, idx) => ({
-        id: Math.random().toString(36).substr(2, 9),
+        id: `log-${sIdx}-${idx}`, // Deterministic IDs
         staffId: s.id,
-        behaviorId: INITIAL_BEHAVIORS[Math.floor(Math.random() * INITIAL_BEHAVIORS.length)].id,
-        timestamp: new Date().toISOString(),
-        verified: Math.random() > 0.5, // Mix of verified/pending
-        metadata: { 
-          tableNumber: Math.floor(Math.random() * 20 + 1).toString(),
-          checkAmount: parseFloat((Math.random() * 100 + 20).toFixed(2))
+        behaviorId: INITIAL_BEHAVIORS[Math.floor(seededRandom(baseSeed + idx) * INITIAL_BEHAVIORS.length)].id,
+        timestamp: '2023-11-21T10:00:00.000Z',
+        verified: seededRandom(baseSeed + idx + 50) > 0.5,
+        metadata: {
+          tableNumber: (Math.floor(seededRandom(baseSeed + idx + 100) * 20) + 1).toString(),
+          checkAmount: parseFloat((seededRandom(baseSeed + idx + 200) * 100 + 20).toFixed(2))
         }
       }));
 
@@ -198,13 +207,22 @@ const generateHistory = (): DailyEntry[] => {
 const AppContext = createContext<AppState | undefined>(undefined);
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
-  const [currentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  // Use fixed initial date for SSR, then update to real date client-side
+  const [currentDate, setCurrentDate] = useState<string>('2023-11-21');
   const [staff] = useState<StaffMember[]>(INITIAL_STAFF);
   const [behaviors, setBehaviors] = useState<Behavior[]>(INITIAL_BEHAVIORS);
   const [benchmarks, setBenchmarksState] = useState<BenchmarkData>(INITIAL_BENCHMARK);
   const [entries, setEntries] = useState<DailyEntry[]>(generateHistory());
   const [gameState, setGameState] = useState<'neutral' | 'winning' | 'losing' | 'celebrating'>('neutral');
   const [industry, setIndustry] = useState<'restaurant' | 'retail'>('restaurant');
+
+  // Update currentDate to actual date after hydration (client-side only)
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    if (today !== currentDate) {
+      setCurrentDate(today);
+    }
+  }, []);
 
   const addEntry = (entry: DailyEntry) => {
     setEntries(prev => [...prev, entry]);

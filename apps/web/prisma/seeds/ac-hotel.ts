@@ -228,9 +228,8 @@ async function main() {
   console.log('✅ Created 30 daily entries')
 
   // Create sample behavior logs for the last 7 days
-  const staffUsers = userData.filter(u =>
-    [RoleType.FRONT_DESK, RoleType.SERVER, RoleType.BARTENDER, RoleType.HOUSEKEEPING].includes(u.roleType as RoleType)
-  )
+  const staffRoleTypes: RoleType[] = [RoleType.FRONT_DESK, RoleType.SERVER, RoleType.BARTENDER, RoleType.HOUSEKEEPING]
+  const staffUsers = userData.filter(u => staffRoleTypes.includes(u.roleType))
   const managerUser = Object.values(users).find(u => u.email === 'sarah@achotel.com')
 
   let logCount = 0
