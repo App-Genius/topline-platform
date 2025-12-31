@@ -1,0 +1,294 @@
+# Behavior Verification Flow
+# ============================
+# Staff logs a behavior -> Manager verifies -> Staff sees it verified
+#
+# This is a P0 multi-role flow that tests:
+# - Staff behavior logging
+# - Manager verification workflow
+# - Cross-role data visibility
+# - RBAC permissions (canVerifyLogs)
+
+flow:
+  id: behavior-verification
+  name: "Behavior Verification Flow"
+  description: "Complete multi-role flow: Staff logs behavior, Manager verifies, Staff sees verified result"
+  priority: p0
+  tags:
+    - multi-role
+    - verification
+    - behavior-logging
+
+# ============================================================================
+# ROLES
+# ============================================================================
+# Define which roles participate in this flow
+# These map to fixtures from e2e/fixtures/multi-role.ts
+
+roles:
+  - type: STAFF
+    fixture: staffPage
+    user: staffUser
+  - type: MANAGER
+    fixture: managerPage
+    user: managerUser
+
+# ============================================================================
+# STEPS
+# ============================================================================
+# Each step executes in order. Role switches between steps are handled by
+# the test generator. Business logic checks run inline during the step.
+
+steps:
+  # --------------------------------------------------------------------------
+  # STEP 1: Staff logs a behavior
+  # --------------------------------------------------------------------------
+  - id: staff-logs-behavior
+    role: STAFF
+    description: "Staff member logs a wine pairing behavior"
+
+    actions:
+      # Navigate to staff page
+      - type: navigate
+        url: /staff
+
+      # Wait for page to load
+      - type: waitFor
+        text: "Good Evening"
+        timeout: 5000
+
+      # Click Quick Log button
+      - type: click
+        selector: "[data-testid='quick-log-button']"
+        fallback:
+          - "button:has-text('Quick Log')"
+          - "text=Quick Log"
+
+      # Wait for behavior selection modal
+      - type: waitFor
+        text: "Select Behaviors"
+        timeout: 3000
+
+      # Select Wine Pairing behavior (two-tap confirm)
+      - type: click
+        selector: "[data-testid='behavior-wine-pairing']"
+        fallback:
+          - "button:has-text('Wine Pairing')"
+          - "text=Wine Pairing"
+
+      # Second tap to confirm
+      - type: click
+        selector: "[data-testid='behavior-wine-pairing']"
+        waitAfter: 500
+
+      # Fill in table number
+      - type: fill
+        selector: "[data-testid='table-number']"
+        value: "12"
+        fallback:
+          - "input[name='tableNumber']"
+          - "input[placeholder*='table']"
+
+      # Submit the behavior log
+      - type: click
+        selector: "[data-testid='submit-behavior']"
+        fallback:
+          - "button:has-text('Submit')"
+          - "button[type='submit']"
+
+    assertions:
+      # Verify success message appears
+      - type: visible
+        selector: "text=Behavior logged"
+        fallback:
+          - "text=Behaviors Logged"
+          - "text=Success"
+
+      # Verify behavior appears in activity list
+      - type: visible
+        selector: "[data-testid='activity-list']"
+
+    businessLogic:
+      # Staff can delete their own unverified logs
+      - function: canStaffDeleteLog
+        args:
+          isStaff: true
+          isLogOwner: true
+          isVerified: false
+        expected:
+          canDelete: true
+
+      # Staff cannot verify logs
+      - function: canVerifyLogs
+        args:
+          role: SERVER
+        expected: false
+
+      # Staff role is correctly classified
+      - function: isStaffRole
+        args:
+          role: SERVER
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 2: Manager views pending verifications
+  # --------------------------------------------------------------------------
+  - id: manager-views-pending
+    role: MANAGER
+    description: "Manager navigates to verification page and sees pending log"
+
+    actions:
+      # Navigate to verification page
+      - type: navigate
+        url: /manager/verify
+
+      # Wait for page to load
+      - type: waitFor
+        text: "Verify Behaviors"
+        timeout: 5000
+
+    assertions:
+      # Verify pending count is visible
+      - type: visible
+        selector: "[data-testid='pending-count']"
+        fallback:
+          - "text=Pending"
+
+      # Verify the logged behavior is in the list
+      - type: visible
+        selector: "[data-testid='verification-item']"
+        fallback:
+          - "text=Wine Pairing"
+
+      # Verify staff name is shown
+      - type: visible
+        selector: "text=Sam"
+
+    businessLogic:
+      # Manager can verify logs
+      - function: canVerifyLogs
+        args:
+          role: MANAGER
+        expected: true
+
+      # Manager role is correctly classified
+      - function: isManagerRole
+        args:
+          role: MANAGER
+        expected: true
+
+      # Manager can access verification feature
+      - function: canAccessFeature
+        args:
+          role: MANAGER
+          feature: verification
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 3: Manager verifies the behavior
+  # --------------------------------------------------------------------------
+  - id: manager-verifies
+    role: MANAGER
+    description: "Manager clicks verify button on the pending behavior"
+
+    actions:
+      # Click the verify button on the first item
+      - type: click
+        selector: "[data-testid='verify-button']"
+        fallback:
+          - "button:has-text('Verify')"
+          - "[aria-label='Verify']"
+        waitAfter: 500
+
+    assertions:
+      # Verify success feedback
+      - type: visible
+        selector: "text=Verified"
+        fallback:
+          - "text=verified"
+          - "[data-testid='verified-badge']"
+
+      # Item should no longer be in pending list or show verified status
+      - type: notVisible
+        selector: "[data-testid='pending-item']:has-text('Wine Pairing')"
+        timeout: 3000
+
+    businessLogic:
+      # After verification, staff can no longer delete
+      - function: canStaffDeleteLog
+        args:
+          isStaff: true
+          isLogOwner: true
+          isVerified: true
+        expected:
+          canDelete: false
+          reason: "Cannot delete verified logs"
+
+  # --------------------------------------------------------------------------
+  # STEP 4: Staff sees the verified status
+  # --------------------------------------------------------------------------
+  - id: staff-sees-verified
+    role: STAFF
+    description: "Staff navigates to their activity and sees the verified badge"
+
+    actions:
+      # Navigate to staff page
+      - type: navigate
+        url: /staff
+
+      # Wait for activity to load
+      - type: waitFor
+        text: "Today's Activity"
+        timeout: 5000
+
+    assertions:
+      # Verify the verified badge is visible
+      - type: visible
+        selector: "[data-testid='verified-badge']"
+        fallback:
+          - ".verified-badge"
+          - "text=Verified"
+
+      # Verify the behavior entry shows verified status
+      - type: text
+        selector: "[data-testid='log-status']"
+        contains: "Verified"
+        fallback:
+          - "[data-testid='activity-item']:first-child"
+
+# ============================================================================
+# METADATA
+# ============================================================================
+
+metadata:
+  # Flow-level settings
+  timeout: 30000  # 30 second timeout per step
+  retries: 1
+
+  # Video recording settings
+  video:
+    enabled: true
+    size:
+      width: 1920
+      height: 1080
+
+  # Reporter settings for viewer
+  reporter:
+    includeTimestamps: true
+    stepLabels: true
+    roleIndicators: true
+
+  # Required seed data
+  seedRequirements:
+    - type: user
+      role: SERVER
+      email: sam@achotel.com
+    - type: user
+      role: MANAGER
+      email: sarah@achotel.com
+    - type: behavior
+      name: Wine Pairing
+
+  # Documentation reference
+  documentation:
+    flow: docs/03-USER-FLOWS.md#42-behavior-verification-flow
+    api: docs/06-API-SPECIFICATION.md
