@@ -45,6 +45,14 @@ packages/db/prisma/migrations/
 # TypeScript
 *.tsbuildinfo
 
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# E2E generated files
+apps/web/e2e/audio/
+
 # Misc
 .vercel
 .netlify

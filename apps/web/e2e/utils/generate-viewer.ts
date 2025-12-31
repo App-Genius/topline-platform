@@ -24,6 +24,12 @@ interface TestFlow {
 
 function findVideoFile(folderPath: string): string | null {
   const files = fs.readdirSync(folderPath);
+
+  // Prefer narrated video if it exists (has audio merged in)
+  const narratedVideo = files.find((f) => f === "narrated-video.mp4");
+  if (narratedVideo) return narratedVideo;
+
+  // Fall back to original video
   const videoFile = files.find((f) => f.endsWith(".webm") || f.endsWith(".mp4"));
   return videoFile || null;
 }

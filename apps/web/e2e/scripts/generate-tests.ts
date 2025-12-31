@@ -266,12 +266,14 @@ function generateTestFile(spec: FlowSpec): string {
   lines.push(fixtureImport);
   lines.push(`import { VerificationLogger } from "../utils/verification-logger";`);
   lines.push(`import { BusinessLogicVerifier } from "../lib/business-logic-verifier";`);
+  lines.push(`import { createNarrator } from "../utils/audio-player";`);
   lines.push(`import * as fs from "fs/promises";`);
   lines.push(`import * as path from "path";`);
   lines.push(``);
 
   // Test describe block
   lines.push(`const logger = new VerificationLogger();`);
+  lines.push(`const narrator = createNarrator("${flow.id}");`);
   lines.push(``);
   lines.push(`test.describe("${flow.name}", () => {`);
 
@@ -295,11 +297,22 @@ function generateTestFile(spec: FlowSpec): string {
   lines.push(`  });`);
   lines.push(``);
 
-  // Main test
+  // Main test - longer timeout when narration may be enabled
   lines.push(`  test("${flow.id}: ${flow.description}", async ({`);
   lines.push(`    ${fixtureParams},`);
   lines.push(`  }) => {`);
+  lines.push(`    // Increase timeout if narration is enabled (audio takes time)`);
+  lines.push(`    if (narrator.isEnabled()) {`);
+  lines.push(`      test.setTimeout(120000); // 2 minutes for narrated tests`);
+  lines.push(`    }`);
+  lines.push(``);
   lines.push(`    const verifier = new BusinessLogicVerifier(logger);`);
+  lines.push(``);
+  // Determine first page variable for intro wait
+  const firstPageVar = needsMultiRoleFixtures ? roles[0].fixture : "page";
+
+  lines.push(`    // Get intro duration (will wait after first navigation)`);
+  lines.push(`    const introDuration = await narrator.intro();`);
   lines.push(``);
 
   // Generate each step
@@ -316,6 +329,7 @@ function generateTestFile(spec: FlowSpec): string {
     lines.push(`    // STEP ${stepNum}: ${step.description}`);
     lines.push(`    // Role: ${step.role}`);
     lines.push(`    // ═══════════════════════════════════════════════════════════════`);
+    lines.push(`    const step${stepNum}Duration = await narrator.step(${stepNum});`);
     lines.push(`    logger.stepStart(${stepNum}, "${step.description}");`);
     if (needsMultiRoleFixtures) {
       lines.push(`    logger.log({ type: "action", description: "Role: ${step.role}", status: "info" });`);
@@ -332,10 +346,60 @@ function generateTestFile(spec: FlowSpec): string {
 
     const indent = needsMultiRoleFixtures ? "      " : "    ";
 
-    // Generate actions
-    if (step.actions && step.actions.length > 0) {
-      for (const action of step.actions) {
+    // Split actions into setup vs interactive
+    // Setup = actions BEFORE the first click/fill (navigate, initial waitFor)
+    // Interactive = first click/fill and everything after
+    const allActions = step.actions || [];
+    let firstInteractiveIndex = allActions.findIndex(a =>
+      a.type === "click" || a.type === "fill"
+    );
+    if (firstInteractiveIndex === -1) {
+      firstInteractiveIndex = allActions.length; // No interactive actions
+    }
+
+    const setupActions = allActions.slice(0, firstInteractiveIndex);
+    const interactiveActions = allActions.slice(firstInteractiveIndex);
+
+    // 1. SETUP ACTIONS: Navigate and wait for page to load
+    if (setupActions.length > 0) {
+      lines.push(`${indent}// Setup: Load page and wait for readiness`);
+      for (const action of setupActions) {
         lines.push(generateActionCode(action, indent));
+        lines.push(``);
+      }
+    }
+
+    // 2. NARRATION WAIT: User sees page while audio explains
+    if (i === 0) {
+      // First step: wait for INTRO + STEP 1 narration
+      lines.push(`${indent}// Wait for intro narration (user sees page while intro plays)`);
+      lines.push(`${indent}if (introDuration > 0) {`);
+      lines.push(`${indent}  await page.waitForTimeout(introDuration);`);
+      lines.push(`${indent}}`);
+      lines.push(``);
+      lines.push(`${indent}// Wait for step narration (user sees page while step is explained)`);
+      lines.push(`${indent}if (step${stepNum}Duration > 0) {`);
+      lines.push(`${indent}  await page.waitForTimeout(step${stepNum}Duration);`);
+      lines.push(`${indent}}`);
+      lines.push(``);
+    } else {
+      // Subsequent steps: wait for step narration BEFORE actions
+      lines.push(`${indent}// Wait for step narration (user sees page while step is explained)`);
+      lines.push(`${indent}if (step${stepNum}Duration > 0) {`);
+      lines.push(`${indent}  await page.waitForTimeout(step${stepNum}Duration);`);
+      lines.push(`${indent}}`);
+      lines.push(``);
+    }
+
+    // 3. INTERACTIVE ACTIONS: User sees taps/fills happen on screen
+    if (interactiveActions.length > 0) {
+      lines.push(`${indent}// Interactive: User sees these actions happen`);
+      for (const action of interactiveActions) {
+        lines.push(generateActionCode(action, indent));
+        // Add pause after clicks and fills so viewer can see them
+        if (action.type === "click" || action.type === "fill") {
+          lines.push(`${indent}await page.waitForTimeout(500); // Pause so viewer sees the action`);
+        }
         lines.push(``);
       }
     }
@@ -360,9 +424,10 @@ function generateTestFile(spec: FlowSpec): string {
     }
     lines.push(``);
 
-    // Add a pause between steps for video clarity
+    // Brief pause after step completion to see the result
     if (i < steps.length - 1) {
-      lines.push(`    await ${pageVar}.waitForTimeout(500);`);
+      lines.push(`    // Brief pause to see step result before next role switch`);
+      lines.push(`    await ${pageVar}.waitForTimeout(1000);`);
       lines.push(``);
     }
   }

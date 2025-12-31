@@ -9,17 +9,20 @@
  *   npx tsx e2e/scripts/run-flow.ts behavior-verification --record
  *   npx tsx e2e/scripts/run-flow.ts behavior-verification --headed
  *   npx tsx e2e/scripts/run-flow.ts behavior-verification --debug
+ *   npx tsx e2e/scripts/run-flow.ts behavior-verification --narrate
  *
  * Options:
  *   --record    Use hq-recording project (1080p video)
  *   --headed    Run in headed mode (visible browser)
  *   --debug     Enable Playwright debug mode
  *   --generate  Regenerate test from YAML before running
+ *   --narrate   Enable audio narration (generates audio if needed)
  */
 
 import { spawn } from "child_process";
 import * as path from "path";
 import * as fs from "fs/promises";
+import { createNarratedVideo } from "./create-narrated-video";
 
 // Paths
 const FLOWS_DIR = path.join(__dirname, "..", "flows");
@@ -30,6 +33,7 @@ interface Options {
   headed: boolean;
   debug: boolean;
   generate: boolean;
+  narrate: boolean;
 }
 
 function parseArgs(): { flowName: string; options: Options } {
@@ -43,10 +47,12 @@ function parseArgs(): { flowName: string; options: Options } {
     console.log("  --headed    Run in headed mode (visible browser)");
     console.log("  --debug     Enable Playwright debug mode");
     console.log("  --generate  Regenerate test from YAML before running");
+    console.log("  --narrate   Enable audio narration (generates audio if needed)");
     console.log("");
     console.log("Examples:");
     console.log("  npx tsx e2e/scripts/run-flow.ts behavior-verification");
     console.log("  npx tsx e2e/scripts/run-flow.ts behavior-verification --record --headed");
+    console.log("  npx tsx e2e/scripts/run-flow.ts behavior-verification --record --narrate");
     process.exit(1);
   }
 
@@ -56,6 +62,7 @@ function parseArgs(): { flowName: string; options: Options } {
     headed: args.includes("--headed"),
     debug: args.includes("--debug"),
     generate: args.includes("--generate"),
+    narrate: args.includes("--narrate"),
   };
 
   return { flowName, options };
@@ -88,6 +95,46 @@ async function generateFromSpec(flowName: string): Promise<void> {
         resolve();
       } else {
         reject(new Error(`Generate failed with code ${code}`));
+      }
+    });
+  });
+}
+
+async function generateNarration(flowName: string): Promise<void> {
+  const audioDir = path.join(__dirname, "..", "audio", flowName);
+
+  // Check if audio already exists
+  try {
+    const files = await fs.readdir(audioDir);
+    if (files.some((f) => f.endsWith(".wav"))) {
+      console.log(`Audio narration found for ${flowName}`);
+      return;
+    }
+  } catch {
+    // Directory doesn't exist, need to generate
+  }
+
+  console.log(`Generating audio narration for: ${flowName}`);
+
+  return new Promise((resolve, reject) => {
+    const proc = spawn(
+      "python",
+      ["e2e/scripts/generate-narration.py", flowName],
+      {
+        cwd: path.join(__dirname, "../.."),
+        stdio: "inherit",
+        env: {
+          ...process.env,
+          PATH: `${path.join(__dirname, "..", ".venv", "bin")}:${process.env.PATH}`,
+        },
+      }
+    );
+
+    proc.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`Narration generation failed with code ${code}`));
       }
     });
   });
@@ -143,6 +190,7 @@ async function runFlow(flowName: string, options: Options): Promise<void> {
       env: {
         ...process.env,
         PWDEBUG: options.debug ? "1" : undefined,
+        E2E_NARRATE: options.narrate ? "1" : undefined,
       },
     });
 
@@ -165,12 +213,18 @@ async function main() {
   console.log(`║  Recording: ${options.record ? "Yes (1080p)" : "No".padEnd(40)}║`);
   console.log(`║  Headed: ${options.headed ? "Yes" : "No".padEnd(48)}║`);
   console.log(`║  Debug: ${options.debug ? "Yes" : "No".padEnd(49)}║`);
+  console.log(`║  Narrate: ${options.narrate ? "Yes (audio)" : "No".padEnd(43)}║`);
   console.log("╚════════════════════════════════════════════════════════════╝");
 
   try {
     // Generate from spec if requested
     if (options.generate) {
       await generateFromSpec(flowName);
+    }
+
+    // Generate narration if requested
+    if (options.narrate) {
+      await generateNarration(flowName);
     }
 
     // Run the flow
@@ -180,7 +234,19 @@ async function main() {
     console.log("✓ Flow completed successfully!");
     console.log("");
 
+    // Post-process: Create narrated video if both narrate and record are enabled
+    if (options.narrate && options.record) {
+      console.log("Post-processing: Creating narrated video...");
+      const narratedPath = await createNarratedVideo(flowName);
+      if (narratedPath) {
+        console.log("");
+        console.log("✓ Narrated video created!");
+        console.log(`  ${narratedPath}`);
+      }
+    }
+
     if (options.record) {
+      console.log("");
       console.log("Video and traces saved to: test-results/");
       console.log("View results: npx playwright show-report");
     }

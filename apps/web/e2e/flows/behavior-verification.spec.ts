@@ -10,10 +10,12 @@
 import { test, expect } from "../fixtures/multi-role";
 import { VerificationLogger } from "../utils/verification-logger";
 import { BusinessLogicVerifier } from "../lib/business-logic-verifier";
+import { createNarrator } from "../utils/audio-player";
 import * as fs from "fs/promises";
 import * as path from "path";
 
 const logger = new VerificationLogger();
+const narrator = createNarrator("behavior-verification");
 
 test.describe("Behavior Verification Flow", () => {
   test.beforeEach(async () => {
@@ -35,24 +37,45 @@ test.describe("Behavior Verification Flow", () => {
   test("behavior-verification: Complete multi-role flow: Staff logs behavior, Manager verifies, Staff sees verified result", async ({
     staffPage, managerPage,
   }) => {
+    // Increase timeout if narration is enabled (audio takes time)
+    if (narrator.isEnabled()) {
+      test.setTimeout(120000); // 2 minutes for narrated tests
+    }
+
     const verifier = new BusinessLogicVerifier(logger);
+
+    // Get intro duration (will wait after first navigation)
+    const introDuration = await narrator.intro();
 
     // ═══════════════════════════════════════════════════════════════
     // STEP 1: Staff member logs a wine upsell behavior
     // Role: STAFF
     // ═══════════════════════════════════════════════════════════════
+    const step1Duration = await narrator.step(1);
     logger.stepStart(1, "Staff member logs a wine upsell behavior");
     logger.log({ type: "action", description: "Role: STAFF", status: "info" });
 
     {
       const page = staffPage;
 
+      // Setup: Load page and wait for readiness
       await page.goto("/staff");
       logger.navigate("/staff");
 
       await expect(page.getByText(/LOG BEHAVIOR/i)).toBeVisible({ timeout: 5000 });
       logger.assertPass("Text 'LOG BEHAVIOR' visible");
 
+      // Wait for intro narration (user sees page while intro plays)
+      if (introDuration > 0) {
+        await page.waitForTimeout(introDuration);
+      }
+
+      // Wait for step narration (user sees page while step is explained)
+      if (step1Duration > 0) {
+        await page.waitForTimeout(step1Duration);
+      }
+
+      // Interactive: User sees these actions happen
       { // Click with fallback
         const targets = ["text=Upsell Wine","[data-testid='behavior-upsell-wine']","button:has-text('Upsell Wine')"];
         let found = false;
@@ -70,6 +93,7 @@ test.describe("Behavior Verification Flow", () => {
       }
       logger.click("text=Upsell Wine");
       await page.waitForTimeout(500);
+      await page.waitForTimeout(500); // Pause so viewer sees the action
 
       await expect(page.getByText(/Tap again/i)).toBeVisible({ timeout: 3000 });
       logger.assertPass("Text 'Tap again' visible");
@@ -91,6 +115,7 @@ test.describe("Behavior Verification Flow", () => {
       }
       logger.click("text=Tap again");
       await page.waitForTimeout(1000);
+      await page.waitForTimeout(500); // Pause so viewer sees the action
 
       // Assertions
       await expect(page.locator("text=MY ACTIONS")).toBeVisible({ timeout: 3000 });
@@ -115,23 +140,31 @@ test.describe("Behavior Verification Flow", () => {
 
     }
 
-    await staffPage.waitForTimeout(500);
+    // Brief pause to see step result before next role switch
+    await staffPage.waitForTimeout(1000);
 
     // ═══════════════════════════════════════════════════════════════
     // STEP 2: Manager navigates to verification page and sees pending log
     // Role: MANAGER
     // ═══════════════════════════════════════════════════════════════
+    const step2Duration = await narrator.step(2);
     logger.stepStart(2, "Manager navigates to verification page and sees pending log");
     logger.log({ type: "action", description: "Role: MANAGER", status: "info" });
 
     {
       const page = managerPage;
 
+      // Setup: Load page and wait for readiness
       await page.goto("/manager/verification");
       logger.navigate("/manager/verification");
 
       await expect(page.getByText(/Behavior Verification/i)).toBeVisible({ timeout: 5000 });
       logger.assertPass("Text 'Behavior Verification' visible");
+
+      // Wait for step narration (user sees page while step is explained)
+      if (step2Duration > 0) {
+        await page.waitForTimeout(step2Duration);
+      }
 
       // Assertions
       { // Assert visible with fallback
@@ -174,18 +207,26 @@ test.describe("Behavior Verification Flow", () => {
 
     }
 
-    await managerPage.waitForTimeout(500);
+    // Brief pause to see step result before next role switch
+    await managerPage.waitForTimeout(1000);
 
     // ═══════════════════════════════════════════════════════════════
     // STEP 3: Manager clicks verify button on the first pending behavior
     // Role: MANAGER
     // ═══════════════════════════════════════════════════════════════
+    const step3Duration = await narrator.step(3);
     logger.stepStart(3, "Manager clicks verify button on the first pending behavior");
     logger.log({ type: "action", description: "Role: MANAGER", status: "info" });
 
     {
       const page = managerPage;
 
+      // Wait for step narration (user sees page while step is explained)
+      if (step3Duration > 0) {
+        await page.waitForTimeout(step3Duration);
+      }
+
+      // Interactive: User sees these actions happen
       { // Click with fallback
         const targets = ["button[title='Verify']","button.bg-emerald-100","[title='Verify']"];
         let found = false;
@@ -203,6 +244,7 @@ test.describe("Behavior Verification Flow", () => {
       }
       logger.click("button[title='Verify']");
       await page.waitForTimeout(1000);
+      await page.waitForTimeout(500); // Pause so viewer sees the action
 
       // Assertions
       await expect(page.locator("text=Behavior Verification")).toBeVisible({ timeout: 3000 });
@@ -217,23 +259,31 @@ test.describe("Behavior Verification Flow", () => {
 
     }
 
-    await managerPage.waitForTimeout(500);
+    // Brief pause to see step result before next role switch
+    await managerPage.waitForTimeout(1000);
 
     // ═══════════════════════════════════════════════════════════════
     // STEP 4: Staff navigates back to check their stats
     // Role: STAFF
     // ═══════════════════════════════════════════════════════════════
+    const step4Duration = await narrator.step(4);
     logger.stepStart(4, "Staff navigates back to check their stats");
     logger.log({ type: "action", description: "Role: STAFF", status: "info" });
 
     {
       const page = staffPage;
 
+      // Setup: Load page and wait for readiness
       await page.goto("/staff");
       logger.navigate("/staff");
 
       await expect(page.getByText(/MY ACTIONS/i)).toBeVisible({ timeout: 5000 });
       logger.assertPass("Text 'MY ACTIONS' visible");
+
+      // Wait for step narration (user sees page while step is explained)
+      if (step4Duration > 0) {
+        await page.waitForTimeout(step4Duration);
+      }
 
       // Assertions
       await expect(page.locator("text=MY ACTIONS")).toBeVisible({ timeout: 3000 });

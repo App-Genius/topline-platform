@@ -12,6 +12,7 @@ flow:
   id: behavior-verification
   name: "Behavior Verification Flow"
   description: "Complete multi-role flow: Staff logs behavior, Manager verifies, Staff sees verified result"
+  narration: "This flow demonstrates the behavior verification workflow between staff and manager roles at AC Hotel."
   priority: p0
   tags:
     - multi-role
@@ -45,6 +46,7 @@ steps:
   - id: staff-logs-behavior
     role: STAFF
     description: "Staff member logs a wine upsell behavior"
+    narration: "Sam, a server at AC Hotel, opens his staff dashboard to log a wine upsell. He taps the Upsell Wine button and confirms with a second tap."
 
     actions:
       # Navigate to staff page
@@ -109,6 +111,7 @@ steps:
   - id: manager-views-pending
     role: MANAGER
     description: "Manager navigates to verification page and sees pending log"
+    narration: "Meanwhile, Sarah the manager opens the verification page. She can see Sam's wine upsell is waiting for verification."
 
     actions:
       # Navigate to verification page
@@ -153,6 +156,7 @@ steps:
   - id: manager-verifies
     role: MANAGER
     description: "Manager clicks verify button on the first pending behavior"
+    narration: "Sarah clicks the green verify button to confirm Sam's wine upsell was genuine. The behavior is now verified."
 
     actions:
       # Click the first green verify button (has title="Verify")
@@ -185,6 +189,7 @@ steps:
   - id: staff-sees-verified
     role: STAFF
     description: "Staff navigates back to check their stats"
+    narration: "Back on Sam's dashboard, his wine upsell now shows as verified. It counts toward his performance score and appears in his actions."
 
     actions:
       # Navigate to staff page

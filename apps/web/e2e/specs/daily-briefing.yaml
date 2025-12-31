@@ -12,6 +12,7 @@ flow:
   id: daily-briefing
   name: "Daily Briefing Flow"
   description: "Manager completes daily briefing: Overview, VIP, Kitchen, Upsell, Training, Attendance"
+  narration: "This flow shows how a manager conducts the daily pre-shift briefing with their team."
   priority: p0
   tags:
     - single-role
@@ -38,6 +39,7 @@ steps:
   - id: manager-opens-briefing
     role: MANAGER
     description: "Manager opens the daily briefing page"
+    narration: "Sarah opens the daily briefing page to prepare for the pre-shift meeting. The overview shows today's reservations and expected covers."
 
     actions:
       - type: navigate
@@ -69,6 +71,7 @@ steps:
   - id: manager-views-vip
     role: MANAGER
     description: "Manager views VIP guest information"
+    narration: "She clicks on VIP Guests to review any special guests dining today, including their preferences and visit history."
 
     actions:
       - type: click
@@ -88,6 +91,7 @@ steps:
   - id: manager-views-kitchen
     role: MANAGER
     description: "Manager views kitchen updates"
+    narration: "The Kitchen Updates tab shows today's specials, any items that are eighty-sixed, and notes from the chef."
 
     actions:
       - type: click
@@ -107,6 +111,7 @@ steps:
   - id: manager-views-upsell
     role: MANAGER
     description: "Manager reviews upsell focus items"
+    narration: "The Upsell Focus tab highlights today's priority items for the team to suggest. These are high-margin opportunities."
 
     actions:
       - type: click
@@ -126,6 +131,7 @@ steps:
   - id: manager-views-training
     role: MANAGER
     description: "Manager reviews training topic"
+    narration: "Training has today's micro-learning topic. Sarah will discuss this briefly with the team during the huddle."
 
     actions:
       - type: click
@@ -145,6 +151,7 @@ steps:
   - id: manager-marks-attendance
     role: MANAGER
     description: "Manager marks team attendance"
+    narration: "Finally, Sarah marks who's present for the shift. She checks off each team member as they arrive for the briefing."
 
     actions:
       - type: click
@@ -171,6 +178,7 @@ steps:
   - id: manager-completes-briefing
     role: MANAGER
     description: "Manager completes the briefing"
+    narration: "With everyone accounted for, Sarah clicks Complete Briefing to wrap up. The team is now ready to start their shift."
 
     actions:
       - type: click

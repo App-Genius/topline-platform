@@ -10,10 +10,12 @@
 import { test, expect } from "../fixtures/multi-role";
 import { VerificationLogger } from "../utils/verification-logger";
 import { BusinessLogicVerifier } from "../lib/business-logic-verifier";
+import { createNarrator } from "../utils/audio-player";
 import * as fs from "fs/promises";
 import * as path from "path";
 
 const logger = new VerificationLogger();
+const narrator = createNarrator("staff-behavior-logging");
 
 test.describe("Staff Behavior Logging Flow", () => {
   test.beforeEach(async () => {
@@ -35,12 +37,21 @@ test.describe("Staff Behavior Logging Flow", () => {
   test("staff-behavior-logging: Staff logs behaviors using two-tap confirmation pattern", async ({
     staffPage,
   }) => {
+    // Increase timeout if narration is enabled (audio takes time)
+    if (narrator.isEnabled()) {
+      test.setTimeout(120000); // 2 minutes for narrated tests
+    }
+
     const verifier = new BusinessLogicVerifier(logger);
+
+    // Get intro duration (will wait after first navigation)
+    const introDuration = await narrator.intro();
 
     // ═══════════════════════════════════════════════════════════════
     // STEP 1: Staff opens their dashboard
     // Role: STAFF
     // ═══════════════════════════════════════════════════════════════
+    const step1Duration = await narrator.step(1);
     logger.stepStart(1, "Staff opens their dashboard");
     logger.log({ type: "action", description: "Role: STAFF", status: "info" });
 
@@ -52,6 +63,11 @@ test.describe("Staff Behavior Logging Flow", () => {
 
       await expect(page.getByText(/LOG BEHAVIOR/i)).toBeVisible({ timeout: 5000 });
       logger.assertPass("Text 'LOG BEHAVIOR' visible");
+
+      // Wait for intro narration (user sees page while intro plays)
+      if (introDuration > 0) {
+        await page.waitForTimeout(introDuration);
+      }
 
       // Assertions
       { // Assert visible with fallback
@@ -89,12 +105,17 @@ test.describe("Staff Behavior Logging Flow", () => {
 
     }
 
+    if (step1Duration > 0) {
+      await staffPage.waitForTimeout(step1Duration);
+    }
+
     await staffPage.waitForTimeout(500);
 
     // ═══════════════════════════════════════════════════════════════
     // STEP 2: Staff logs a wine upsell behavior
     // Role: STAFF
     // ═══════════════════════════════════════════════════════════════
+    const step2Duration = await narrator.step(2);
     logger.stepStart(2, "Staff logs a wine upsell behavior");
     logger.log({ type: "action", description: "Role: STAFF", status: "info" });
 
@@ -153,12 +174,17 @@ test.describe("Staff Behavior Logging Flow", () => {
 
     }
 
+    if (step2Duration > 0) {
+      await staffPage.waitForTimeout(step2Duration);
+    }
+
     await staffPage.waitForTimeout(500);
 
     // ═══════════════════════════════════════════════════════════════
     // STEP 3: Staff logs a dessert suggestion
     // Role: STAFF
     // ═══════════════════════════════════════════════════════════════
+    const step3Duration = await narrator.step(3);
     logger.stepStart(3, "Staff logs a dessert suggestion");
     logger.log({ type: "action", description: "Role: STAFF", status: "info" });
 
@@ -210,12 +236,17 @@ test.describe("Staff Behavior Logging Flow", () => {
 
     }
 
+    if (step3Duration > 0) {
+      await staffPage.waitForTimeout(step3Duration);
+    }
+
     await staffPage.waitForTimeout(500);
 
     // ═══════════════════════════════════════════════════════════════
     // STEP 4: Staff verifies their logged behaviors appear
     // Role: STAFF
     // ═══════════════════════════════════════════════════════════════
+    const step4Duration = await narrator.step(4);
     logger.stepStart(4, "Staff verifies their logged behaviors appear");
     logger.log({ type: "action", description: "Role: STAFF", status: "info" });
 
@@ -250,6 +281,10 @@ test.describe("Staff Behavior Logging Flow", () => {
         }
       }
 
+    }
+
+    if (step4Duration > 0) {
+      await staffPage.waitForTimeout(step4Duration);
     }
 
     // Final summary

@@ -10,10 +10,12 @@
 import { test, expect } from "../fixtures/multi-role";
 import { VerificationLogger } from "../utils/verification-logger";
 import { BusinessLogicVerifier } from "../lib/business-logic-verifier";
+import { createNarrator } from "../utils/audio-player";
 import * as fs from "fs/promises";
 import * as path from "path";
 
 const logger = new VerificationLogger();
+const narrator = createNarrator("daily-briefing");
 
 test.describe("Daily Briefing Flow", () => {
   test.beforeEach(async () => {
@@ -35,12 +37,21 @@ test.describe("Daily Briefing Flow", () => {
   test("daily-briefing: Manager completes daily briefing: Overview, VIP, Kitchen, Upsell, Training, Attendance", async ({
     managerPage,
   }) => {
+    // Increase timeout if narration is enabled (audio takes time)
+    if (narrator.isEnabled()) {
+      test.setTimeout(120000); // 2 minutes for narrated tests
+    }
+
     const verifier = new BusinessLogicVerifier(logger);
+
+    // Get intro duration (will wait after first navigation)
+    const introDuration = await narrator.intro();
 
     // ═══════════════════════════════════════════════════════════════
     // STEP 1: Manager opens the daily briefing page
     // Role: MANAGER
     // ═══════════════════════════════════════════════════════════════
+    const step1Duration = await narrator.step(1);
     logger.stepStart(1, "Manager opens the daily briefing page");
     logger.log({ type: "action", description: "Role: MANAGER", status: "info" });
 
@@ -52,6 +63,11 @@ test.describe("Daily Briefing Flow", () => {
 
       await expect(page.getByText(/Daily Briefing/i)).toBeVisible({ timeout: 5000 });
       logger.assertPass("Text 'Daily Briefing' visible");
+
+      // Wait for intro narration (user sees page while intro plays)
+      if (introDuration > 0) {
+        await page.waitForTimeout(introDuration);
+      }
 
       // Assertions
       await expect(page.locator("[role='tab'][aria-selected='true']")).toBeVisible({ timeout: 3000 });
@@ -71,12 +87,17 @@ test.describe("Daily Briefing Flow", () => {
 
     }
 
+    if (step1Duration > 0) {
+      await managerPage.waitForTimeout(step1Duration);
+    }
+
     await managerPage.waitForTimeout(500);
 
     // ═══════════════════════════════════════════════════════════════
     // STEP 2: Manager views VIP guest information
     // Role: MANAGER
     // ═══════════════════════════════════════════════════════════════
+    const step2Duration = await narrator.step(2);
     logger.stepStart(2, "Manager views VIP guest information");
     logger.log({ type: "action", description: "Role: MANAGER", status: "info" });
 
@@ -107,12 +128,17 @@ test.describe("Daily Briefing Flow", () => {
 
     }
 
+    if (step2Duration > 0) {
+      await managerPage.waitForTimeout(step2Duration);
+    }
+
     await managerPage.waitForTimeout(500);
 
     // ═══════════════════════════════════════════════════════════════
     // STEP 3: Manager views kitchen updates
     // Role: MANAGER
     // ═══════════════════════════════════════════════════════════════
+    const step3Duration = await narrator.step(3);
     logger.stepStart(3, "Manager views kitchen updates");
     logger.log({ type: "action", description: "Role: MANAGER", status: "info" });
 
@@ -143,12 +169,17 @@ test.describe("Daily Briefing Flow", () => {
 
     }
 
+    if (step3Duration > 0) {
+      await managerPage.waitForTimeout(step3Duration);
+    }
+
     await managerPage.waitForTimeout(500);
 
     // ═══════════════════════════════════════════════════════════════
     // STEP 4: Manager reviews upsell focus items
     // Role: MANAGER
     // ═══════════════════════════════════════════════════════════════
+    const step4Duration = await narrator.step(4);
     logger.stepStart(4, "Manager reviews upsell focus items");
     logger.log({ type: "action", description: "Role: MANAGER", status: "info" });
 
@@ -179,12 +210,17 @@ test.describe("Daily Briefing Flow", () => {
 
     }
 
+    if (step4Duration > 0) {
+      await managerPage.waitForTimeout(step4Duration);
+    }
+
     await managerPage.waitForTimeout(500);
 
     // ═══════════════════════════════════════════════════════════════
     // STEP 5: Manager reviews training topic
     // Role: MANAGER
     // ═══════════════════════════════════════════════════════════════
+    const step5Duration = await narrator.step(5);
     logger.stepStart(5, "Manager reviews training topic");
     logger.log({ type: "action", description: "Role: MANAGER", status: "info" });
 
@@ -215,12 +251,17 @@ test.describe("Daily Briefing Flow", () => {
 
     }
 
+    if (step5Duration > 0) {
+      await managerPage.waitForTimeout(step5Duration);
+    }
+
     await managerPage.waitForTimeout(500);
 
     // ═══════════════════════════════════════════════════════════════
     // STEP 6: Manager marks team attendance
     // Role: MANAGER
     // ═══════════════════════════════════════════════════════════════
+    const step6Duration = await narrator.step(6);
     logger.stepStart(6, "Manager marks team attendance");
     logger.log({ type: "action", description: "Role: MANAGER", status: "info" });
 
@@ -269,12 +310,17 @@ test.describe("Daily Briefing Flow", () => {
 
     }
 
+    if (step6Duration > 0) {
+      await managerPage.waitForTimeout(step6Duration);
+    }
+
     await managerPage.waitForTimeout(500);
 
     // ═══════════════════════════════════════════════════════════════
     // STEP 7: Manager completes the briefing
     // Role: MANAGER
     // ═══════════════════════════════════════════════════════════════
+    const step7Duration = await narrator.step(7);
     logger.stepStart(7, "Manager completes the briefing");
     logger.log({ type: "action", description: "Role: MANAGER", status: "info" });
 
@@ -321,6 +367,10 @@ test.describe("Daily Briefing Flow", () => {
         }
       }
 
+    }
+
+    if (step7Duration > 0) {
+      await managerPage.waitForTimeout(step7Duration);
     }
 
     // Final summary

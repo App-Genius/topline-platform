@@ -12,6 +12,7 @@ flow:
   id: staff-behavior-logging
   name: "Staff Behavior Logging Flow"
   description: "Staff logs behaviors using two-tap confirmation pattern"
+  narration: "This flow shows how staff members log their behaviors throughout a shift using the two-tap confirmation pattern."
   priority: p1
   tags:
     - single-role
@@ -38,6 +39,7 @@ steps:
   - id: staff-opens-dashboard
     role: STAFF
     description: "Staff opens their dashboard"
+    narration: "Sam opens his staff dashboard on his phone. He can see the behavior logging section and his personal stats."
 
     actions:
       - type: navigate
@@ -71,6 +73,7 @@ steps:
   - id: staff-logs-wine-upsell
     role: STAFF
     description: "Staff logs a wine upsell behavior"
+    narration: "Sam just recommended a wine pairing to a guest. He taps Upsell Wine, then taps again to confirm. The behavior is logged."
 
     actions:
       - type: click
@@ -110,6 +113,7 @@ steps:
   - id: staff-logs-dessert
     role: STAFF
     description: "Staff logs a dessert suggestion"
+    narration: "A few tables later, Sam suggested the chocolate cake. He logs it the same way - tap Dessert, then confirm."
 
     actions:
       - type: click
@@ -140,6 +144,7 @@ steps:
   - id: staff-views-stats
     role: STAFF
     description: "Staff verifies their logged behaviors appear"
+    narration: "Sam can now see both behaviors in his My Actions section. His average check and behavior count are updated in real time."
 
     actions:
       - type: waitFor
