@@ -1,0 +1,198 @@
+# Daily Briefing Flow
+# ============================
+# Manager conducts daily briefing through all tabs and completes
+#
+# This is a P0 single-role flow that tests:
+# - Manager briefing workflow
+# - Tab navigation
+# - Attendance marking
+# - Briefing completion
+
+flow:
+  id: daily-briefing
+  name: "Daily Briefing Flow"
+  description: "Manager completes daily briefing: Overview, VIP, Kitchen, Upsell, Training, Attendance"
+  priority: p0
+  tags:
+    - single-role
+    - briefing
+    - manager
+
+# ============================================================================
+# ROLES
+# ============================================================================
+
+roles:
+  - type: MANAGER
+    fixture: managerPage
+    user: managerUser
+
+# ============================================================================
+# STEPS
+# ============================================================================
+
+steps:
+  # --------------------------------------------------------------------------
+  # STEP 1: Navigate to briefing and see overview
+  # --------------------------------------------------------------------------
+  - id: manager-opens-briefing
+    role: MANAGER
+    description: "Manager opens the daily briefing page"
+
+    actions:
+      - type: navigate
+        url: /manager/briefing
+
+      - type: waitFor
+        text: "Daily Briefing"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "[role='tab'][aria-selected='true']"
+
+    businessLogic:
+      - function: isManagerRole
+        args:
+          role: MANAGER
+        expected: true
+
+      - function: canAccessFeature
+        args:
+          role: MANAGER
+          feature: briefing
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 2: Navigate through VIP tab
+  # --------------------------------------------------------------------------
+  - id: manager-views-vip
+    role: MANAGER
+    description: "Manager views VIP guest information"
+
+    actions:
+      - type: click
+        selector: "[role='tab']:has-text('VIP')"
+        fallback:
+          - "text=VIP"
+          - "[aria-label*='VIP']"
+        waitAfter: 500
+
+    assertions:
+      - type: visible
+        selector: "[role='tabpanel']"
+
+  # --------------------------------------------------------------------------
+  # STEP 3: Navigate through Kitchen tab
+  # --------------------------------------------------------------------------
+  - id: manager-views-kitchen
+    role: MANAGER
+    description: "Manager views kitchen updates"
+
+    actions:
+      - type: click
+        selector: "[role='tab']:has-text('Kitchen')"
+        fallback:
+          - "text=Kitchen"
+          - "[aria-label*='Kitchen']"
+        waitAfter: 500
+
+    assertions:
+      - type: visible
+        selector: "[role='tabpanel']"
+
+  # --------------------------------------------------------------------------
+  # STEP 4: Navigate through Upsell tab
+  # --------------------------------------------------------------------------
+  - id: manager-views-upsell
+    role: MANAGER
+    description: "Manager reviews upsell focus items"
+
+    actions:
+      - type: click
+        selector: "[role='tab']:has-text('Upsell')"
+        fallback:
+          - "text=Upsell"
+          - "[aria-label*='Upsell']"
+        waitAfter: 500
+
+    assertions:
+      - type: visible
+        selector: "[role='tabpanel']"
+
+  # --------------------------------------------------------------------------
+  # STEP 5: Navigate through Training tab
+  # --------------------------------------------------------------------------
+  - id: manager-views-training
+    role: MANAGER
+    description: "Manager reviews training topic"
+
+    actions:
+      - type: click
+        selector: "[role='tab']:has-text('Training')"
+        fallback:
+          - "text=Training"
+          - "[aria-label*='Training']"
+        waitAfter: 500
+
+    assertions:
+      - type: visible
+        selector: "[role='tabpanel']"
+
+  # --------------------------------------------------------------------------
+  # STEP 6: Mark attendance
+  # --------------------------------------------------------------------------
+  - id: manager-marks-attendance
+    role: MANAGER
+    description: "Manager marks team attendance"
+
+    actions:
+      - type: click
+        selector: "[role='tab']:has-text('Attendance')"
+        fallback:
+          - "text=Attendance"
+          - "[aria-label*='Attendance']"
+        waitAfter: 500
+
+      # Click first checkbox to mark someone present
+      - type: click
+        selector: "[role='checkbox']"
+        fallback:
+          - "input[type='checkbox']"
+        waitAfter: 300
+
+    assertions:
+      - type: visible
+        selector: "[role='tabpanel']"
+
+  # --------------------------------------------------------------------------
+  # STEP 7: Complete briefing
+  # --------------------------------------------------------------------------
+  - id: manager-completes-briefing
+    role: MANAGER
+    description: "Manager completes the briefing"
+
+    actions:
+      - type: click
+        selector: "button:has-text('Complete Briefing')"
+        fallback:
+          - "[data-testid='complete-briefing']"
+          - "text=Complete"
+        waitAfter: 1000
+
+    assertions:
+      - type: visible
+        selector: "text=complete"
+        fallback:
+          - "text=success"
+          - "text=Completed"
+
+# ============================================================================
+# METADATA
+# ============================================================================
+
+metadata:
+  timeout: 30000
+  retries: 1
+  video:
+    enabled: true

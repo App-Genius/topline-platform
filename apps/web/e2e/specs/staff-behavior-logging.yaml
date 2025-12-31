@@ -1,0 +1,175 @@
+# Staff Behavior Logging Flow
+# ============================
+# Staff logs multiple behaviors through the behavior buttons
+#
+# This is a P1 single-role flow that tests:
+# - Staff dashboard access
+# - Behavior button interaction
+# - Two-tap confirmation pattern
+# - My Actions section update
+
+flow:
+  id: staff-behavior-logging
+  name: "Staff Behavior Logging Flow"
+  description: "Staff logs behaviors using two-tap confirmation pattern"
+  priority: p1
+  tags:
+    - single-role
+    - staff
+    - behavior-logging
+
+# ============================================================================
+# ROLES
+# ============================================================================
+
+roles:
+  - type: STAFF
+    fixture: staffPage
+    user: staffUser
+
+# ============================================================================
+# STEPS
+# ============================================================================
+
+steps:
+  # --------------------------------------------------------------------------
+  # STEP 1: Staff opens dashboard
+  # --------------------------------------------------------------------------
+  - id: staff-opens-dashboard
+    role: STAFF
+    description: "Staff opens their dashboard"
+
+    actions:
+      - type: navigate
+        url: /staff
+
+      - type: waitFor
+        text: "LOG BEHAVIOR"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=MY ACTIONS"
+        fallback:
+          - "text=ACTIONS"
+
+    businessLogic:
+      - function: isStaffRole
+        args:
+          role: SERVER
+        expected: true
+
+      - function: canAccessFeature
+        args:
+          role: SERVER
+          feature: behavior-logging
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 2: Staff logs first behavior (Upsell Wine)
+  # --------------------------------------------------------------------------
+  - id: staff-logs-wine-upsell
+    role: STAFF
+    description: "Staff logs a wine upsell behavior"
+
+    actions:
+      - type: click
+        selector: "text=Upsell Wine"
+        fallback:
+          - "[data-testid='behavior-upsell-wine']"
+          - "button:has-text('Upsell Wine')"
+          - "button:has-text('Wine')"
+        waitAfter: 500
+
+      - type: waitFor
+        text: "Tap again"
+        timeout: 3000
+
+      - type: click
+        selector: "text=Tap again"
+        fallback:
+          - "text=Confirm"
+        waitAfter: 1000
+
+    assertions:
+      - type: visible
+        selector: "text=MY ACTIONS"
+
+    businessLogic:
+      - function: canStaffDeleteLog
+        args:
+          isStaff: true
+          isLogOwner: true
+          isVerified: false
+        expected:
+          canDelete: true
+
+  # --------------------------------------------------------------------------
+  # STEP 3: Staff logs second behavior (Suggest Dessert)
+  # --------------------------------------------------------------------------
+  - id: staff-logs-dessert
+    role: STAFF
+    description: "Staff logs a dessert suggestion"
+
+    actions:
+      - type: click
+        selector: "text=Dessert"
+        fallback:
+          - "[data-testid='behavior-dessert']"
+          - "button:has-text('Dessert')"
+          - "button:has-text('Suggest')"
+        waitAfter: 500
+
+      - type: waitFor
+        text: "Tap again"
+        timeout: 3000
+
+      - type: click
+        selector: "text=Tap again"
+        fallback:
+          - "text=Confirm"
+        waitAfter: 1000
+
+    assertions:
+      - type: visible
+        selector: "text=MY ACTIONS"
+
+  # --------------------------------------------------------------------------
+  # STEP 4: Staff checks their stats
+  # --------------------------------------------------------------------------
+  - id: staff-views-stats
+    role: STAFF
+    description: "Staff verifies their logged behaviors appear"
+
+    actions:
+      - type: waitFor
+        text: "MY ACTIONS"
+        timeout: 3000
+
+    assertions:
+      - type: visible
+        selector: "text=MY ACTIONS"
+
+      - type: visible
+        selector: "text=AVG CHECK"
+        fallback:
+          - "text=Average"
+          - "text=CHECK"
+
+# ============================================================================
+# METADATA
+# ============================================================================
+
+metadata:
+  timeout: 30000
+  retries: 1
+  video:
+    enabled: true
+  seedRequirements:
+    - type: user
+      role: SERVER
+      email: sam@achotel.com
+    - type: behavior
+      name: Upsell Wine
+    - type: behavior
+      name: Suggest Dessert

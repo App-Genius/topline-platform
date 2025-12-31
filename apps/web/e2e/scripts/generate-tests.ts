@@ -226,14 +226,20 @@ function escapeRegex(str: string): string {
 function generateTestFile(spec: FlowSpec): string {
   const { flow, roles, steps } = spec;
 
-  // Determine if multi-role
+  // Determine if multi-role or if using role-specific fixtures
   const isMultiRole = roles.length > 1;
-  const fixtureImport = isMultiRole
+  const usesRoleFixtures = roles.some(r =>
+    r.fixture === "staffPage" || r.fixture === "managerPage" || r.fixture === "adminPage"
+  );
+
+  // Use multi-role fixtures if multiple roles OR using role-specific fixtures
+  const needsMultiRoleFixtures = isMultiRole || usesRoleFixtures;
+  const fixtureImport = needsMultiRoleFixtures
     ? `import { test, expect } from "../fixtures/multi-role";`
     : `import { test, expect } from "../fixtures";`;
 
   // Build fixture params
-  const fixtureParams = isMultiRole
+  const fixtureParams = needsMultiRoleFixtures
     ? roles.map((r) => r.fixture).join(", ")
     : "page";
 
@@ -302,48 +308,56 @@ function generateTestFile(spec: FlowSpec): string {
     const stepNum = i + 1;
     const roleFixture = rolePageMap[step.role] || "page";
 
-    // For multi-role, we need to use the correct page variable
-    const pageVar = isMultiRole ? roleFixture : "page";
+    // For multi-role or role-specific fixtures, use the fixture name
+    // Otherwise use the default "page"
+    const pageVar = needsMultiRoleFixtures ? roleFixture : "page";
 
     lines.push(`    // ═══════════════════════════════════════════════════════════════`);
     lines.push(`    // STEP ${stepNum}: ${step.description}`);
     lines.push(`    // Role: ${step.role}`);
     lines.push(`    // ═══════════════════════════════════════════════════════════════`);
     lines.push(`    logger.stepStart(${stepNum}, "${step.description}");`);
-    if (isMultiRole) {
+    if (needsMultiRoleFixtures) {
       lines.push(`    logger.log({ type: "action", description: "Role: ${step.role}", status: "info" });`);
     }
     lines.push(``);
 
-    // Create a scoped page variable for this step
-    lines.push(`    {`);
-    lines.push(`      const page = ${pageVar};`);
-    lines.push(``);
+    // For role-specific fixtures, create a scoped page variable
+    // This allows action code to use `page` consistently
+    if (needsMultiRoleFixtures) {
+      lines.push(`    {`);
+      lines.push(`      const page = ${pageVar};`);
+      lines.push(``);
+    }
+
+    const indent = needsMultiRoleFixtures ? "      " : "    ";
 
     // Generate actions
     if (step.actions && step.actions.length > 0) {
       for (const action of step.actions) {
-        lines.push(generateActionCode(action, "      "));
+        lines.push(generateActionCode(action, indent));
         lines.push(``);
       }
     }
 
     // Generate assertions
     if (step.assertions && step.assertions.length > 0) {
-      lines.push(`      // Assertions`);
+      lines.push(`${indent}// Assertions`);
       for (const assertion of step.assertions) {
-        lines.push(generateAssertionCode(assertion, "      "));
+        lines.push(generateAssertionCode(assertion, indent));
         lines.push(``);
       }
     }
 
     // Generate business logic checks
     if (step.businessLogic && step.businessLogic.length > 0) {
-      lines.push(generateBusinessLogicCode(step.businessLogic, "      "));
+      lines.push(generateBusinessLogicCode(step.businessLogic, indent));
       lines.push(``);
     }
 
-    lines.push(`    }`);
+    if (needsMultiRoleFixtures) {
+      lines.push(`    }`);
+    }
     lines.push(``);
 
     // Add a pause between steps for video clarity
