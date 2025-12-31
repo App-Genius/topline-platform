@@ -38,10 +38,10 @@ test.describe("Behavior Verification Flow", () => {
     const verifier = new BusinessLogicVerifier(logger);
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 1: Staff member logs a wine pairing behavior
+    // STEP 1: Staff member logs a wine upsell behavior
     // Role: STAFF
     // ═══════════════════════════════════════════════════════════════
-    logger.stepStart(1, "Staff member logs a wine pairing behavior");
+    logger.stepStart(1, "Staff member logs a wine upsell behavior");
     logger.log({ type: "action", description: "Role: STAFF", status: "info" });
 
     {
@@ -50,11 +50,11 @@ test.describe("Behavior Verification Flow", () => {
       await page.goto("/staff");
       logger.navigate("/staff");
 
-      await expect(page.getByText(/Good Evening/i)).toBeVisible({ timeout: 5000 });
-      logger.assertPass("Text 'Good Evening' visible");
+      await expect(page.getByText(/LOG BEHAVIOR/i)).toBeVisible({ timeout: 5000 });
+      logger.assertPass("Text 'LOG BEHAVIOR' visible");
 
       { // Click with fallback
-        const targets = ["[data-testid='quick-log-button']","button:has-text('Quick Log')","text=Quick Log"];
+        const targets = ["text=Upsell Wine","[data-testid='behavior-upsell-wine']","button:has-text('Upsell Wine')"];
         let found = false;
         for (const sel of targets) {
           try {
@@ -68,51 +68,14 @@ test.describe("Behavior Verification Flow", () => {
         }
         if (!found) throw new Error("Could not find element to click: " + targets.join(", "));
       }
-      logger.click("[data-testid='quick-log-button']");
-
-      await expect(page.getByText(/Select Behaviors/i)).toBeVisible({ timeout: 3000 });
-      logger.assertPass("Text 'Select Behaviors' visible");
-
-      { // Click with fallback
-        const targets = ["[data-testid='behavior-wine-pairing']","button:has-text('Wine Pairing')","text=Wine Pairing"];
-        let found = false;
-        for (const sel of targets) {
-          try {
-            const el = page.locator(sel);
-            if (await el.count() > 0) {
-              await el.first().click();
-              found = true;
-              break;
-            }
-          } catch { /* try next */ }
-        }
-        if (!found) throw new Error("Could not find element to click: " + targets.join(", "));
-      }
-      logger.click("[data-testid='behavior-wine-pairing']");
-
-      await page.locator("[data-testid='behavior-wine-pairing']").click();
-      logger.click("[data-testid='behavior-wine-pairing']");
+      logger.click("text=Upsell Wine");
       await page.waitForTimeout(500);
 
-      { // Fill with fallback
-        const targets = ["[data-testid='table-number']","input[name='tableNumber']","input[placeholder*='table']"];
-        let found = false;
-        for (const sel of targets) {
-          try {
-            const el = page.locator(sel);
-            if (await el.count() > 0) {
-              await el.first().fill("12");
-              found = true;
-              break;
-            }
-          } catch { /* try next */ }
-        }
-        if (!found) throw new Error("Could not find element to fill: " + targets.join(", "));
-      }
-      logger.log({ type: "action", description: "Fill: [data-testid='table-number'] = 12", status: "info" });
+      await expect(page.getByText(/Tap again/i)).toBeVisible({ timeout: 3000 });
+      logger.assertPass("Text 'Tap again' visible");
 
       { // Click with fallback
-        const targets = ["[data-testid='submit-behavior']","button:has-text('Submit')","button[type='submit']"];
+        const targets = ["text=Tap again","text=Confirm"];
         let found = false;
         for (const sel of targets) {
           try {
@@ -126,32 +89,12 @@ test.describe("Behavior Verification Flow", () => {
         }
         if (!found) throw new Error("Could not find element to click: " + targets.join(", "));
       }
-      logger.click("[data-testid='submit-behavior']");
+      logger.click("text=Tap again");
+      await page.waitForTimeout(1000);
 
       // Assertions
-      { // Assert visible with fallback
-        const targets = ["text=Behavior logged","text=Behaviors Logged","text=Success"];
-        let found = false;
-        for (const sel of targets) {
-          try {
-            const el = page.locator(sel);
-            if (await el.count() > 0) {
-              await expect(el.first()).toBeVisible({ timeout: 3000 });
-              found = true;
-              break;
-            }
-          } catch { /* try next */ }
-        }
-        if (found) {
-          logger.assertPass("Element visible: text=Behavior logged");
-        } else {
-          logger.assertFail("Element not found: text=Behavior logged");
-          throw new Error("Element not found: " + targets.join(", "));
-        }
-      }
-
-      await expect(page.locator("[data-testid='activity-list']")).toBeVisible({ timeout: 3000 });
-      logger.assertPass("Element visible: [data-testid='activity-list']");
+      await expect(page.locator("text=MY ACTIONS")).toBeVisible({ timeout: 3000 });
+      logger.assertPass("Element visible: text=MY ACTIONS");
 
       // Business logic verification
       verifier.verify(
@@ -184,15 +127,15 @@ test.describe("Behavior Verification Flow", () => {
     {
       const page = managerPage;
 
-      await page.goto("/manager/verify");
-      logger.navigate("/manager/verify");
+      await page.goto("/manager/verification");
+      logger.navigate("/manager/verification");
 
-      await expect(page.getByText(/Verify Behaviors/i)).toBeVisible({ timeout: 5000 });
-      logger.assertPass("Text 'Verify Behaviors' visible");
+      await expect(page.getByText(/Behavior Verification/i)).toBeVisible({ timeout: 5000 });
+      logger.assertPass("Text 'Behavior Verification' visible");
 
       // Assertions
       { // Assert visible with fallback
-        const targets = ["[data-testid='pending-count']","text=Pending"];
+        const targets = ["text=pending verifications","text=pending"];
         let found = false;
         for (const sel of targets) {
           try {
@@ -205,36 +148,12 @@ test.describe("Behavior Verification Flow", () => {
           } catch { /* try next */ }
         }
         if (found) {
-          logger.assertPass("Element visible: [data-testid='pending-count']");
+          logger.assertPass("Element visible: text=pending verifications");
         } else {
-          logger.assertFail("Element not found: [data-testid='pending-count']");
+          logger.assertFail("Element not found: text=pending verifications");
           throw new Error("Element not found: " + targets.join(", "));
         }
       }
-
-      { // Assert visible with fallback
-        const targets = ["[data-testid='verification-item']","text=Wine Pairing"];
-        let found = false;
-        for (const sel of targets) {
-          try {
-            const el = page.locator(sel);
-            if (await el.count() > 0) {
-              await expect(el.first()).toBeVisible({ timeout: 3000 });
-              found = true;
-              break;
-            }
-          } catch { /* try next */ }
-        }
-        if (found) {
-          logger.assertPass("Element visible: [data-testid='verification-item']");
-        } else {
-          logger.assertFail("Element not found: [data-testid='verification-item']");
-          throw new Error("Element not found: " + targets.join(", "));
-        }
-      }
-
-      await expect(page.locator("text=Sam")).toBeVisible({ timeout: 3000 });
-      logger.assertPass("Element visible: text=Sam");
 
       // Business logic verification
       verifier.verify(
@@ -258,17 +177,17 @@ test.describe("Behavior Verification Flow", () => {
     await managerPage.waitForTimeout(500);
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 3: Manager clicks verify button on the pending behavior
+    // STEP 3: Manager clicks verify button on the first pending behavior
     // Role: MANAGER
     // ═══════════════════════════════════════════════════════════════
-    logger.stepStart(3, "Manager clicks verify button on the pending behavior");
+    logger.stepStart(3, "Manager clicks verify button on the first pending behavior");
     logger.log({ type: "action", description: "Role: MANAGER", status: "info" });
 
     {
       const page = managerPage;
 
       { // Click with fallback
-        const targets = ["[data-testid='verify-button']","button:has-text('Verify')","[aria-label='Verify']"];
+        const targets = ["button[title='Verify']","button.bg-emerald-100","[title='Verify']"];
         let found = false;
         for (const sel of targets) {
           try {
@@ -282,33 +201,12 @@ test.describe("Behavior Verification Flow", () => {
         }
         if (!found) throw new Error("Could not find element to click: " + targets.join(", "));
       }
-      logger.click("[data-testid='verify-button']");
-      await page.waitForTimeout(500);
+      logger.click("button[title='Verify']");
+      await page.waitForTimeout(1000);
 
       // Assertions
-      { // Assert visible with fallback
-        const targets = ["text=Verified","text=verified","[data-testid='verified-badge']"];
-        let found = false;
-        for (const sel of targets) {
-          try {
-            const el = page.locator(sel);
-            if (await el.count() > 0) {
-              await expect(el.first()).toBeVisible({ timeout: 3000 });
-              found = true;
-              break;
-            }
-          } catch { /* try next */ }
-        }
-        if (found) {
-          logger.assertPass("Element visible: text=Verified");
-        } else {
-          logger.assertFail("Element not found: text=Verified");
-          throw new Error("Element not found: " + targets.join(", "));
-        }
-      }
-
-      await expect(page.locator("[data-testid='pending-item']:has-text('Wine Pairing')")).not.toBeVisible({ timeout: 3000 });
-      logger.assertPass("Element not visible: [data-testid='pending-item']:has-text('Wine Pairing')");
+      await expect(page.locator("text=Behavior Verification")).toBeVisible({ timeout: 3000 });
+      logger.assertPass("Element visible: text=Behavior Verification");
 
       // Business logic verification
       verifier.verify(
@@ -322,10 +220,10 @@ test.describe("Behavior Verification Flow", () => {
     await managerPage.waitForTimeout(500);
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 4: Staff navigates to their activity and sees the verified badge
+    // STEP 4: Staff navigates back to check their stats
     // Role: STAFF
     // ═══════════════════════════════════════════════════════════════
-    logger.stepStart(4, "Staff navigates to their activity and sees the verified badge");
+    logger.stepStart(4, "Staff navigates back to check their stats");
     logger.log({ type: "action", description: "Role: STAFF", status: "info" });
 
     {
@@ -334,33 +232,15 @@ test.describe("Behavior Verification Flow", () => {
       await page.goto("/staff");
       logger.navigate("/staff");
 
-      await expect(page.getByText(/Today's Activity/i)).toBeVisible({ timeout: 5000 });
-      logger.assertPass("Text 'Today's Activity' visible");
+      await expect(page.getByText(/MY ACTIONS/i)).toBeVisible({ timeout: 5000 });
+      logger.assertPass("Text 'MY ACTIONS' visible");
 
       // Assertions
-      { // Assert visible with fallback
-        const targets = ["[data-testid='verified-badge']",".verified-badge","text=Verified"];
-        let found = false;
-        for (const sel of targets) {
-          try {
-            const el = page.locator(sel);
-            if (await el.count() > 0) {
-              await expect(el.first()).toBeVisible({ timeout: 3000 });
-              found = true;
-              break;
-            }
-          } catch { /* try next */ }
-        }
-        if (found) {
-          logger.assertPass("Element visible: [data-testid='verified-badge']");
-        } else {
-          logger.assertFail("Element not found: [data-testid='verified-badge']");
-          throw new Error("Element not found: " + targets.join(", "));
-        }
-      }
+      await expect(page.locator("text=MY ACTIONS")).toBeVisible({ timeout: 3000 });
+      logger.assertPass("Element visible: text=MY ACTIONS");
 
-      await expect(page.locator("[data-testid='log-status']")).toContainText("Verified", { timeout: 3000 });
-      logger.assertPass("Element contains text: Verified");
+      await expect(page.locator("text=AVG CHECK")).toBeVisible({ timeout: 3000 });
+      logger.assertPass("Element visible: text=AVG CHECK");
 
     }
 

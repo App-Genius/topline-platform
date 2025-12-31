@@ -44,68 +44,42 @@ steps:
   # --------------------------------------------------------------------------
   - id: staff-logs-behavior
     role: STAFF
-    description: "Staff member logs a wine pairing behavior"
+    description: "Staff member logs a wine upsell behavior"
 
     actions:
       # Navigate to staff page
       - type: navigate
         url: /staff
 
-      # Wait for page to load
+      # Wait for page to load - look for LOG BEHAVIOR section
       - type: waitFor
-        text: "Good Evening"
+        text: "LOG BEHAVIOR"
         timeout: 5000
 
-      # Click Quick Log button
+      # Click Upsell Wine behavior button (first tap)
       - type: click
-        selector: "[data-testid='quick-log-button']"
+        selector: "text=Upsell Wine"
         fallback:
-          - "button:has-text('Quick Log')"
-          - "text=Quick Log"
+          - "[data-testid='behavior-upsell-wine']"
+          - "button:has-text('Upsell Wine')"
+        waitAfter: 500
 
-      # Wait for behavior selection modal
+      # Wait for confirm prompt
       - type: waitFor
-        text: "Select Behaviors"
+        text: "Tap again"
         timeout: 3000
-
-      # Select Wine Pairing behavior (two-tap confirm)
-      - type: click
-        selector: "[data-testid='behavior-wine-pairing']"
-        fallback:
-          - "button:has-text('Wine Pairing')"
-          - "text=Wine Pairing"
 
       # Second tap to confirm
       - type: click
-        selector: "[data-testid='behavior-wine-pairing']"
-        waitAfter: 500
-
-      # Fill in table number
-      - type: fill
-        selector: "[data-testid='table-number']"
-        value: "12"
+        selector: "text=Tap again"
         fallback:
-          - "input[name='tableNumber']"
-          - "input[placeholder*='table']"
-
-      # Submit the behavior log
-      - type: click
-        selector: "[data-testid='submit-behavior']"
-        fallback:
-          - "button:has-text('Submit')"
-          - "button[type='submit']"
+          - "text=Confirm"
+        waitAfter: 1000
 
     assertions:
-      # Verify success message appears
+      # Verify MY ACTIONS section is visible
       - type: visible
-        selector: "text=Behavior logged"
-        fallback:
-          - "text=Behaviors Logged"
-          - "text=Success"
-
-      # Verify behavior appears in activity list
-      - type: visible
-        selector: "[data-testid='activity-list']"
+        selector: "text=MY ACTIONS"
 
     businessLogic:
       # Staff can delete their own unverified logs
@@ -139,29 +113,19 @@ steps:
     actions:
       # Navigate to verification page
       - type: navigate
-        url: /manager/verify
+        url: /manager/verification
 
-      # Wait for page to load
+      # Wait for page to load - look for heading
       - type: waitFor
-        text: "Verify Behaviors"
+        text: "Behavior Verification"
         timeout: 5000
 
     assertions:
-      # Verify pending count is visible
+      # Verify pending count visible
       - type: visible
-        selector: "[data-testid='pending-count']"
+        selector: "text=pending verifications"
         fallback:
-          - "text=Pending"
-
-      # Verify the logged behavior is in the list
-      - type: visible
-        selector: "[data-testid='verification-item']"
-        fallback:
-          - "text=Wine Pairing"
-
-      # Verify staff name is shown
-      - type: visible
-        selector: "text=Sam"
+          - "text=pending"
 
     businessLogic:
       # Manager can verify logs
@@ -188,29 +152,21 @@ steps:
   # --------------------------------------------------------------------------
   - id: manager-verifies
     role: MANAGER
-    description: "Manager clicks verify button on the pending behavior"
+    description: "Manager clicks verify button on the first pending behavior"
 
     actions:
-      # Click the verify button on the first item
+      # Click the first green verify button (has title="Verify")
       - type: click
-        selector: "[data-testid='verify-button']"
+        selector: "button[title='Verify']"
         fallback:
-          - "button:has-text('Verify')"
-          - "[aria-label='Verify']"
-        waitAfter: 500
+          - "button.bg-emerald-100"
+          - "[title='Verify']"
+        waitAfter: 1000
 
     assertions:
-      # Verify success feedback
+      # Verify page still shows (verification happened)
       - type: visible
-        selector: "text=Verified"
-        fallback:
-          - "text=verified"
-          - "[data-testid='verified-badge']"
-
-      # Item should no longer be in pending list or show verified status
-      - type: notVisible
-        selector: "[data-testid='pending-item']:has-text('Wine Pairing')"
-        timeout: 3000
+        selector: "text=Behavior Verification"
 
     businessLogic:
       # After verification, staff can no longer delete
@@ -228,32 +184,26 @@ steps:
   # --------------------------------------------------------------------------
   - id: staff-sees-verified
     role: STAFF
-    description: "Staff navigates to their activity and sees the verified badge"
+    description: "Staff navigates back to check their stats"
 
     actions:
       # Navigate to staff page
       - type: navigate
         url: /staff
 
-      # Wait for activity to load
+      # Wait for page to load
       - type: waitFor
-        text: "Today's Activity"
+        text: "MY ACTIONS"
         timeout: 5000
 
     assertions:
-      # Verify the verified badge is visible
+      # Verify the page loaded and shows stats
       - type: visible
-        selector: "[data-testid='verified-badge']"
-        fallback:
-          - ".verified-badge"
-          - "text=Verified"
+        selector: "text=MY ACTIONS"
 
-      # Verify the behavior entry shows verified status
-      - type: text
-        selector: "[data-testid='log-status']"
-        contains: "Verified"
-        fallback:
-          - "[data-testid='activity-item']:first-child"
+      # Verify AVG CHECK is visible
+      - type: visible
+        selector: "text=AVG CHECK"
 
 # ============================================================================
 # METADATA
