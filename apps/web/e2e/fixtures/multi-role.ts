@@ -51,7 +51,7 @@ async function createTestSessionToken(payload: {
  * For CI, ensure database is seeded before running tests.
  */
 const AC_HOTEL_ORG = {
-  id: "cmjtia41t0000p4ag1ylq1zrw",
+  id: "cmjul6msl0000p4r7o01hq8s6",
   name: "AC Hotel",
 };
 
@@ -60,7 +60,7 @@ const AC_HOTEL_ORG = {
  * Can log behaviors, view own stats
  */
 export const staffUser = {
-  id: "cmjtia4al000np4ag3j61vq4c", // Sam Server from AC Hotel seed
+  id: "cmjul6n22000sp4r7tqfp9tom", // Sam Server from AC Hotel seed
   email: "sam@achotel.com",
   name: "Sam Server",
   roleType: "SERVER",
@@ -73,7 +73,7 @@ export const staffUser = {
  * This is Sarah Manager from the original fixtures
  */
 export const managerUser = {
-  id: "cmjtia4ak000mp4agzwakylgo",
+  id: "cmjul6n20000mp4r7qdv8qgat",
   email: "sarah@achotel.com",
   name: "Sarah Manager",
   roleType: "MANAGER",
@@ -85,9 +85,9 @@ export const managerUser = {
  * Admin User - Full permissions, can configure organization
  */
 export const adminUser = {
-  id: "cmjtia4aj000lp4agb2k8n9f3", // Admin from AC Hotel seed
-  email: "admin@achotel.com",
-  name: "AC Admin",
+  id: "cmjul6n1x000kp4r7sxcwk1um", // Joel Dean from AC Hotel seed
+  email: "joel@achotel.com",
+  name: "Joel Dean",
   roleType: "ADMIN",
   permissions: ["*"],
   orgId: AC_HOTEL_ORG.id,

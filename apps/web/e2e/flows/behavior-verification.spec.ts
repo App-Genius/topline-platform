@@ -48,11 +48,11 @@ test.describe("Behavior Verification Flow", () => {
     const introDuration = await narrator.intro();
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 1: Staff member logs a wine upsell behavior
+    // STEP 1: Staff member logs a wine pairing recommendation
     // Role: STAFF
     // ═══════════════════════════════════════════════════════════════
     const step1Duration = await narrator.step(1);
-    logger.stepStart(1, "Staff member logs a wine upsell behavior");
+    logger.stepStart(1, "Staff member logs a wine pairing recommendation");
     logger.log({ type: "action", description: "Role: STAFF", status: "info" });
 
     {
@@ -62,83 +62,66 @@ test.describe("Behavior Verification Flow", () => {
       await page.goto("/staff");
       logger.navigate("/staff");
 
-      await expect(page.getByText(/LOG BEHAVIOR/i)).toBeVisible({ timeout: 5000 });
-      logger.assertPass("Text 'LOG BEHAVIOR' visible");
+      await expect(page.getByText(/Log Behavior/i)).toBeVisible({ timeout: 5000 });
+      logger.assertPass("Text 'Log Behavior' visible");
 
       // Wait for intro narration (user sees page while intro plays)
-      const introMs = 7025;
+      const introMs = 0;
       if (introMs > 0) {
         await page.waitForTimeout(introMs);
       }
 
-      // Execute actions at cue point timestamps (synchronized with narration)
-      const stepStartTime = Date.now();
-      const stepDurationMs = 9375;
-
-      // Cue point [5.34s]: "taps the Upsell Wine"
-      {
-        const targetMs = 5340;
-        const elapsed = Date.now() - stepStartTime;
-        if (elapsed < targetMs) {
-          await page.waitForTimeout(targetMs - elapsed);
-        }
-        { // Click with fallback
-          const targets = ["text=Upsell Wine","[data-testid='behavior-upsell-wine']","button:has-text('Upsell Wine')"];
-          let found = false;
-          for (const sel of targets) {
-            try {
-              const el = page.locator(sel);
-              if (await el.count() > 0) {
-                await el.first().click();
-                found = true;
-                break;
-              }
-            } catch { /* try next */ }
-          }
-          if (!found) throw new Error("Could not find element to click: " + targets.join(", "));
-        }
-        logger.click("text=Upsell Wine");
-        await page.waitForTimeout(500);
-        await page.waitForTimeout(300); // Brief pause to see action
+      // Wait for step narration (no cue points - sequential execution)
+      const stepDurationMs = 0;
+      if (stepDurationMs > 0) {
+        await page.waitForTimeout(stepDurationMs);
       }
 
-      // Cue point [7.53s]: "confirms with a second tap"
-      {
-        const targetMs = 7530;
-        const elapsed = Date.now() - stepStartTime;
-        if (elapsed < targetMs) {
-          await page.waitForTimeout(targetMs - elapsed);
+      // Interactive actions (after narration)
+      { // Click with fallback
+        const targets = ["text=Recommend wine pairing","[data-testid='behavior-wine-pairing']","button:has-text('wine pairing')"];
+        let found = false;
+        for (const sel of targets) {
+          try {
+            const el = page.locator(sel);
+            if (await el.count() > 0) {
+              await el.first().click();
+              found = true;
+              break;
+            }
+          } catch { /* try next */ }
         }
-        { // Click with fallback
-          const targets = ["text=Tap again","text=Confirm"];
-          let found = false;
-          for (const sel of targets) {
-            try {
-              const el = page.locator(sel);
-              if (await el.count() > 0) {
-                await el.first().click();
-                found = true;
-                break;
-              }
-            } catch { /* try next */ }
-          }
-          if (!found) throw new Error("Could not find element to click: " + targets.join(", "));
-        }
-        logger.click("text=Tap again");
-        await page.waitForTimeout(1000);
-        await page.waitForTimeout(300); // Brief pause to see action
+        if (!found) throw new Error("Could not find element to click: " + targets.join(", "));
       }
+      logger.click("text=Recommend wine pairing");
+      await page.waitForTimeout(500);
+      await page.waitForTimeout(500);
 
-      // Wait for remaining narration
-      {
-        const elapsed = Date.now() - stepStartTime;
-        const remaining = stepDurationMs - elapsed;
-        if (remaining > 0) await page.waitForTimeout(remaining);
+      await expect(page.getByText(/Tap again/i)).toBeVisible({ timeout: 3000 });
+      logger.assertPass("Text 'Tap again' visible");
+
+      { // Click with fallback
+        const targets = ["text=Tap again","text=Confirm"];
+        let found = false;
+        for (const sel of targets) {
+          try {
+            const el = page.locator(sel);
+            if (await el.count() > 0) {
+              await el.first().click();
+              found = true;
+              break;
+            }
+          } catch { /* try next */ }
+        }
+        if (!found) throw new Error("Could not find element to click: " + targets.join(", "));
       }
+      logger.click("text=Tap again");
+      await page.waitForTimeout(1000);
+      await page.waitForTimeout(500);
 
       // Assertions
-      await expect(page.locator("text=MY ACTIONS")).toBeVisible({ timeout: 3000 });
-      logger.assertPass("Element visible: text=MY ACTIONS");
+      await expect(page.locator("text=My Actions")).toBeVisible({ timeout: 3000 });
+      logger.assertPass("Element visible: text=My Actions");
 
       // Business logic verification
       verifier.verify(
@@ -163,11 +146,11 @@ test.describe("Behavior Verification Flow", () => {
     await staffPage.waitForTimeout(1000);
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 2: Manager navigates to verification page and sees pending log
+    // STEP 2: Manager navigates to verification page and sees pending logs
     // Role: MANAGER
     // ═══════════════════════════════════════════════════════════════
     const step2Duration = await narrator.step(2);
-    logger.stepStart(2, "Manager navigates to verification page and sees pending log");
+    logger.stepStart(2, "Manager navigates to verification page and sees pending logs");
     logger.log({ type: "action", description: "Role: MANAGER", status: "info" });
 
     {
@@ -180,33 +163,18 @@ test.describe("Behavior Verification Flow", () => {
       await expect(page.getByText(/Behavior Verification/i)).toBeVisible({ timeout: 5000 });
       logger.assertPass("Text 'Behavior Verification' visible");
 
+      await expect(page.getByText(/pending verifications/i)).toBeVisible({ timeout: 5000 });
+      logger.assertPass("Text 'pending verifications' visible");
+
       // Wait for step narration (no cue points - sequential execution)
-      const stepDurationMs = 7525;
+      const stepDurationMs = 0;
       if (stepDurationMs > 0) {
         await page.waitForTimeout(stepDurationMs);
       }
 
       // Assertions
-      { // Assert visible with fallback
-        const targets = ["text=pending verifications","text=pending"];
-        let found = false;
-        for (const sel of targets) {
-          try {
-            const el = page.locator(sel);
-            if (await el.count() > 0) {
-              await expect(el.first()).toBeVisible({ timeout: 3000 });
-              found = true;
-              break;
-            }
-          } catch { /* try next */ }
-        }
-        if (found) {
-          logger.assertPass("Element visible: text=pending verifications");
-        } else {
-          logger.assertFail("Element not found: text=pending verifications");
-          throw new Error("Element not found: " + targets.join(", "));
-        }
-      }
+      await expect(page.locator("text=pending verifications")).toBeVisible({ timeout: 3000 });
+      logger.assertPass("Element visible: text=pending verifications");
 
       // Business logic verification
       verifier.verify(
@@ -231,57 +199,67 @@ test.describe("Behavior Verification Flow", () => {
     await managerPage.waitForTimeout(1000);
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 3: Manager clicks verify button on the first pending behavior
+    // STEP 3: Manager bulk verifies all pending behaviors
     // Role: MANAGER
     // ═══════════════════════════════════════════════════════════════
     const step3Duration = await narrator.step(3);
-    logger.stepStart(3, "Manager clicks verify button on the first pending behavior");
+    logger.stepStart(3, "Manager bulk verifies all pending behaviors");
     logger.log({ type: "action", description: "Role: MANAGER", status: "info" });
 
     {
       const page = managerPage;
 
-      // Execute actions at cue point timestamps (synchronized with narration)
-      const stepStartTime = Date.now();
-      const stepDurationMs = 7150;
-
-      // Cue point [2.15s]: "[estimated: button[title='Verify']]"
-      {
-        const targetMs = 2150;
-        const elapsed = Date.now() - stepStartTime;
-        if (elapsed < targetMs) {
-          await page.waitForTimeout(targetMs - elapsed);
-        }
-        { // Click with fallback
-          const targets = ["button[title='Verify']","button.bg-emerald-100","[title='Verify']"];
-          let found = false;
-          for (const sel of targets) {
-            try {
-              const el = page.locator(sel);
-              if (await el.count() > 0) {
-                await el.first().click();
-                found = true;
-                break;
-              }
-            } catch { /* try next */ }
-          }
-          if (!found) throw new Error("Could not find element to click: " + targets.join(", "));
-        }
-        logger.click("button[title='Verify']");
-        await page.waitForTimeout(1000);
-        await page.waitForTimeout(300); // Brief pause to see action
+      // Wait for step narration (no cue points - sequential execution)
+      const stepDurationMs = 0;
+      if (stepDurationMs > 0) {
+        await page.waitForTimeout(stepDurationMs);
       }
 
-      // Wait for remaining narration
-      {
-        const elapsed = Date.now() - stepStartTime;
-        const remaining = stepDurationMs - elapsed;
-        if (remaining > 0) await page.waitForTimeout(remaining);
+      // Interactive actions (after narration)
+      { // Click with fallback
+        const targets = ["button:has-text('Select All')","[data-testid='select-all']"];
+        let found = false;
+        for (const sel of targets) {
+          try {
+            const el = page.locator(sel);
+            if (await el.count() > 0) {
+              await el.first().click();
+              found = true;
+              break;
+            }
+          } catch { /* try next */ }
+        }
+        if (!found) throw new Error("Could not find element to click: " + targets.join(", "));
       }
+      logger.click("button:has-text('Select All')");
+      await page.waitForTimeout(500);
+      await page.waitForTimeout(500);
+
+      { // Click with fallback
+        const targets = ["button:has-text('Verify Selected')","[data-testid='verify-selected']"];
+        let found = false;
+        for (const sel of targets) {
+          try {
+            const el = page.locator(sel);
+            if (await el.count() > 0) {
+              await el.first().click();
+              found = true;
+              break;
+            }
+          } catch { /* try next */ }
+        }
+        if (!found) throw new Error("Could not find element to click: " + targets.join(", "));
+      }
+      logger.click("button:has-text('Verify Selected')");
+      await page.waitForTimeout(2000);
+      await page.waitForTimeout(500);
+
+      await expect(page.getByText(/All caught up/i)).toBeVisible({ timeout: 5000 });
+      logger.assertPass("Text 'All caught up' visible");
 
       // Assertions
-      await expect(page.locator("text=Behavior Verification")).toBeVisible({ timeout: 3000 });
-      logger.assertPass("Element visible: text=Behavior Verification");
+      await expect(page.locator("text=All caught up")).toBeVisible({ timeout: 3000 });
+      logger.assertPass("Element visible: text=All caught up");
 
       // Business logic verification
       verifier.verify(
@@ -310,21 +288,21 @@ test.describe("Behavior Verification Flow", () => {
       await page.goto("/staff");
       logger.navigate("/staff");
 
-      await expect(page.getByText(/MY ACTIONS/i)).toBeVisible({ timeout: 5000 });
-      logger.assertPass("Text 'MY ACTIONS' visible");
+      await expect(page.getByText(/My Actions/i)).toBeVisible({ timeout: 5000 });
+      logger.assertPass("Text 'My Actions' visible");
 
       // Wait for step narration (no cue points - sequential execution)
-      const stepDurationMs = 8200;
+      const stepDurationMs = 0;
       if (stepDurationMs > 0) {
         await page.waitForTimeout(stepDurationMs);
       }
 
       // Assertions
-      await expect(page.locator("text=MY ACTIONS")).toBeVisible({ timeout: 3000 });
-      logger.assertPass("Element visible: text=MY ACTIONS");
+      await expect(page.locator("text=My Actions")).toBeVisible({ timeout: 3000 });
+      logger.assertPass("Element visible: text=My Actions");
 
-      await expect(page.locator("text=AVG CHECK")).toBeVisible({ timeout: 3000 });
-      logger.assertPass("Element visible: text=AVG CHECK");
+      await expect(page.locator("text=verified")).toBeVisible({ timeout: 3000 });
+      logger.assertPass("Element visible: text=verified");
 
     }
 

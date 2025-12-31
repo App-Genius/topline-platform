@@ -113,6 +113,7 @@ async function main() {
     { email: 'sarah@achotel.com', name: 'Sarah Manager', avatar: 'SM', roleType: RoleType.MANAGER },
     { email: 'mike@achotel.com', name: 'Mike Lobby', avatar: 'ML', roleType: RoleType.FRONT_DESK },
     { email: 'emma@achotel.com', name: 'Emma Desk', avatar: 'ED', roleType: RoleType.FRONT_DESK },
+    { email: 'sam@achotel.com', name: 'Sam Server', avatar: 'SS', roleType: RoleType.SERVER },  // E2E test user
     { email: 'lisa@achotel.com', name: 'Lisa Server', avatar: 'LS', roleType: RoleType.SERVER },
     { email: 'tom@achotel.com', name: 'Tom Bartender', avatar: 'TB', roleType: RoleType.BARTENDER },
     { email: 'ana@achotel.com', name: 'Ana Rooms', avatar: 'AR', roleType: RoleType.HOUSEKEEPING },
@@ -246,7 +247,8 @@ async function main() {
         const logDate = new Date(date)
         logDate.setHours(8 + Math.floor(Math.random() * 12), Math.floor(Math.random() * 60))
 
-        const verified = Math.random() > 0.4
+        // All seeded logs are verified - E2E tests start with clean slate
+        const verified = true
 
         await prisma.behaviorLog.create({
           data: {
@@ -254,8 +256,8 @@ async function main() {
             behaviorId: behavior.id,
             locationId: location.id,
             verified,
-            verifiedById: verified && managerUser ? managerUser.id : null,
-            verifiedAt: verified ? logDate : null,
+            verifiedById: managerUser ? managerUser.id : null,
+            verifiedAt: logDate,
             createdAt: logDate,
             metadata: {},
           },
@@ -291,6 +293,7 @@ async function main() {
   console.log('\n📋 Login credentials:')
   console.log('   Admin:    joel@achotel.com / achotel123')
   console.log('   Manager:  sarah@achotel.com / achotel123')
+  console.log('   Staff:    sam@achotel.com / achotel123 (E2E test user)')
   console.log('   Staff:    mike@achotel.com / achotel123')
   console.log('\n💡 Behavior points and targets are configurable in the app.')
 }

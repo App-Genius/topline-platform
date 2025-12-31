@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 export default function VerificationPage() {
   const { data: pendingData, isLoading, error, refetch } = usePendingVerifications();
@@ -82,14 +83,22 @@ export default function VerificationPage() {
     if (selectedIds.size === 0) return;
 
     try {
-      await bulkVerify.mutateAsync({
+      const result = await bulkVerify.mutateAsync({
         ids: Array.from(selectedIds),
         verified,
       });
+      const count = selectedIds.size;
       setSelectedIds(new Set());
       refetch();
+
+      if (verified) {
+        toast.success(`${count} behavior${count > 1 ? 's' : ''} verified successfully`);
+      } else {
+        toast.info(`${count} behavior${count > 1 ? 's' : ''} rejected`);
+      }
     } catch (error) {
       console.error('Failed to bulk verify:', error);
+      toast.error('Failed to update behaviors. Please try again.');
     }
   };
 
@@ -330,7 +339,15 @@ export default function VerificationPage() {
                   <div className="col-span-2 flex justify-end gap-2">
                     <button
                       onClick={() => {
-                        bulkVerify.mutate({ ids: [log.id], verified: true });
+                        bulkVerify.mutate({ ids: [log.id], verified: true }, {
+                          onSuccess: () => {
+                            toast.success(`Verified ${log.user.name}'s ${log.behavior.name}`);
+                            refetch();
+                          },
+                          onError: () => {
+                            toast.error('Failed to verify behavior');
+                          }
+                        });
                       }}
                       disabled={bulkVerify.isPending}
                       className="p-2 rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors"
@@ -340,7 +357,15 @@ export default function VerificationPage() {
                     </button>
                     <button
                       onClick={() => {
-                        bulkVerify.mutate({ ids: [log.id], verified: false });
+                        bulkVerify.mutate({ ids: [log.id], verified: false }, {
+                          onSuccess: () => {
+                            toast.info(`Rejected ${log.user.name}'s ${log.behavior.name}`);
+                            refetch();
+                          },
+                          onError: () => {
+                            toast.error('Failed to reject behavior');
+                          }
+                        });
                       }}
                       disabled={bulkVerify.isPending}
                       className="p-2 rounded-lg bg-rose-100 text-rose-600 hover:bg-rose-200 transition-colors"

@@ -6,6 +6,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import CelebrationOverlay from "@/components/CelebrationOverlay";
+import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -29,6 +30,7 @@ export default function RootLayout({
                 {children}
               </ErrorBoundary>
               <CelebrationOverlay />
+              <Toaster position="top-right" richColors />
             </AppProvider>
           </AuthProvider>
         </QueryProvider>

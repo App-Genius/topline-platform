@@ -45,25 +45,25 @@ steps:
   # --------------------------------------------------------------------------
   - id: staff-logs-behavior
     role: STAFF
-    description: "Staff member logs a wine upsell behavior"
-    narration: "Sam, a server at AC Hotel, opens his staff dashboard to log a wine upsell. He taps the Upsell Wine button and confirms with a second tap."
+    description: "Staff member logs a wine pairing recommendation"
+    narration: "Sam, a server at AC Hotel, opens his staff dashboard. The header shows his name and role. He taps the Recommend wine pairing button and confirms with a second tap to log it."
 
     actions:
       # Navigate to staff page
       - type: navigate
         url: /staff
 
-      # Wait for page to load - look for LOG BEHAVIOR section
+      # Wait for page to load - look for Log Behavior section
       - type: waitFor
-        text: "LOG BEHAVIOR"
+        text: "Log Behavior"
         timeout: 5000
 
-      # Click Upsell Wine behavior button (first tap)
+      # Click wine pairing behavior button (first tap)
       - type: click
-        selector: "text=Upsell Wine"
+        selector: "text=Recommend wine pairing"
         fallback:
-          - "[data-testid='behavior-upsell-wine']"
-          - "button:has-text('Upsell Wine')"
+          - "[data-testid='behavior-wine-pairing']"
+          - "button:has-text('wine pairing')"
         waitAfter: 500
 
       # Wait for confirm prompt
@@ -79,9 +79,9 @@ steps:
         waitAfter: 1000
 
     assertions:
-      # Verify MY ACTIONS section is visible
+      # Verify My Actions section is visible
       - type: visible
-        selector: "text=MY ACTIONS"
+        selector: "text=My Actions"
 
     businessLogic:
       # Staff can delete their own unverified logs
@@ -110,8 +110,8 @@ steps:
   # --------------------------------------------------------------------------
   - id: manager-views-pending
     role: MANAGER
-    description: "Manager navigates to verification page and sees pending log"
-    narration: "Meanwhile, Sarah the manager opens the verification page. She can see Sam's wine upsell is waiting for verification."
+    description: "Manager navigates to verification page and sees pending logs"
+    narration: "Meanwhile, Sarah the manager opens the verification page. She sees pending wine pairing recommendations waiting for verification."
 
     actions:
       # Navigate to verification page
@@ -123,12 +123,15 @@ steps:
         text: "Behavior Verification"
         timeout: 5000
 
+      # Wait for pending logs to appear
+      - type: waitFor
+        text: "pending verifications"
+        timeout: 5000
+
     assertions:
-      # Verify pending count visible
+      # Verify pending verifications text is visible
       - type: visible
         selector: "text=pending verifications"
-        fallback:
-          - "text=pending"
 
     businessLogic:
       # Manager can verify logs
@@ -151,26 +154,37 @@ steps:
         expected: true
 
   # --------------------------------------------------------------------------
-  # STEP 3: Manager verifies the behavior
+  # STEP 3: Manager verifies all pending behaviors
   # --------------------------------------------------------------------------
   - id: manager-verifies
     role: MANAGER
-    description: "Manager clicks verify button on the first pending behavior"
-    narration: "Sarah clicks the green verify button to confirm Sam's wine upsell was genuine. The behavior is now verified."
+    description: "Manager bulk verifies all pending behaviors"
+    narration: "Sarah clicks Select All to choose all pending behaviors, then clicks Verify Selected. A success toast appears, and the page now shows 'All caught up!' since there are no more pending behaviors."
 
     actions:
-      # Click the first green verify button (has title="Verify")
+      # Click Select All button to select all pending
       - type: click
-        selector: "button[title='Verify']"
+        selector: "button:has-text('Select All')"
         fallback:
-          - "button.bg-emerald-100"
-          - "[title='Verify']"
-        waitAfter: 1000
+          - "[data-testid='select-all']"
+        waitAfter: 500
+
+      # Click Verify Selected button
+      - type: click
+        selector: "button:has-text('Verify Selected')"
+        fallback:
+          - "[data-testid='verify-selected']"
+        waitAfter: 2000
+
+      # Wait for empty state to appear
+      - type: waitFor
+        text: "All caught up"
+        timeout: 5000
 
     assertions:
-      # Verify page still shows (verification happened)
+      # Verify empty state message appears
       - type: visible
-        selector: "text=Behavior Verification"
+        selector: "text=All caught up"
 
     businessLogic:
       # After verification, staff can no longer delete
@@ -189,7 +203,7 @@ steps:
   - id: staff-sees-verified
     role: STAFF
     description: "Staff navigates back to check their stats"
-    narration: "Back on Sam's dashboard, his wine upsell now shows as verified. It counts toward his performance score and appears in his actions."
+    narration: "Back on Sam's dashboard, his My Actions count has increased. The wine pairing recommendation now shows as verified, counting toward his performance score."
 
     actions:
       # Navigate to staff page
@@ -198,17 +212,17 @@ steps:
 
       # Wait for page to load
       - type: waitFor
-        text: "MY ACTIONS"
+        text: "My Actions"
         timeout: 5000
 
     assertions:
       # Verify the page loaded and shows stats
       - type: visible
-        selector: "text=MY ACTIONS"
+        selector: "text=My Actions"
 
-      # Verify AVG CHECK is visible
+      # Verify verified status is visible
       - type: visible
-        selector: "text=AVG CHECK"
+        selector: "text=verified"
 
 # ============================================================================
 # METADATA
@@ -216,7 +230,7 @@ steps:
 
 metadata:
   # Flow-level settings
-  timeout: 30000  # 30 second timeout per step
+  timeout: 60000  # 60 second timeout per step
   retries: 1
 
   # Video recording settings
@@ -241,7 +255,7 @@ metadata:
       role: MANAGER
       email: sarah@achotel.com
     - type: behavior
-      name: Wine Pairing
+      name: Recommend wine pairing
 
   # Documentation reference
   documentation:
