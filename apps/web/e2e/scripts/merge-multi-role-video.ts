@@ -110,7 +110,9 @@ function findVideoFiles(folderPath: string): string[] {
   return files
     .filter((f) => f.endsWith(".webm") || (f.endsWith(".mp4") && f !== "narrated-video.mp4"))
     .map((f) => path.join(folderPath, f))
-    .sort((a, b) => fs.statSync(a).mtime.getTime() - fs.statSync(b).mtime.getTime());
+    // Sort by file SIZE descending - staff video is larger (more activity/duration)
+    // This is more reliable than mtime which can vary based on context close order
+    .sort((a, b) => fs.statSync(b).size - fs.statSync(a).size);
 }
 
 function getOrderedAudioFiles(flowId: string): string[] {
@@ -250,30 +252,84 @@ async function mergeMultiRoleVideo(
     combinedAudioPath,
   ]);
 
-  // 6. Build video segments
+  // 6. Build video segments with correct offsets
+  // Key insight: video_trim_time = audio_time + navigation_offset
+  // Staff offset = ~2s (navigation at test start)
+  // Manager offset = calculated from when manager actually navigates + page load time
+  const NAVIGATION_TIME = 2.0; // Seconds for page.goto() + ready assertion
+  const MANAGER_PAGE_LOAD_TIME = 10.0; // Extra time for manager page data to load
+
   const segments: VideoSegment[] = [];
-  let staffOffset = 0;
-  let managerOffset = 0;
+  const cache = loadNarrationCache();
 
-  for (const step of timeline) {
-    const isManager = step.role === "MANAGER";
-    const videoPath = isManager && managerVideo ? managerVideo : staffVideo;
-    const offset = isManager && managerVideo ? managerOffset : staffOffset;
+  // Staff video offset: navigation happens at start
+  // Staff page is visible from NAVIGATION_TIME onwards
+  const staffVideoOffset = NAVIGATION_TIME;
 
+  // Manager video offset: calculated on first manager step
+  let managerVideoOffset: number | null = null;
+
+  // Get intro duration
+  const introEntry = cache[`${flowId}/intro`];
+  const introDuration = introEntry?.duration || 0;
+
+  // INTRO SEGMENT: Show staff page (already visible after navigation)
+  // Audio: 0-introDuration → Video: staff NAVIGATION_TIME to NAVIGATION_TIME+introDuration
+  if (introDuration > 0) {
     segments.push({
-      role: step.role,
-      videoPath,
-      startTime: step.startTime,
-      endTime: step.endTime,
-      trimStart: offset,
-      trimEnd: offset + step.duration,
+      role: "STAFF",
+      videoPath: staffVideo,
+      startTime: 0,
+      endTime: introDuration,
+      trimStart: staffVideoOffset, // Skip navigation, start when UI visible
+      trimEnd: staffVideoOffset + introDuration,
     });
+  }
 
-    // Update offset for next segment of this role
-    if (isManager && managerVideo) {
-      managerOffset += step.duration + 1;
+  // STEP SEGMENTS: Apply offset based on role
+  for (const step of timeline) {
+    const isManager = step.role === "MANAGER" && managerVideo;
+
+    if (isManager) {
+      // Calculate manager offset on first manager step
+      if (managerVideoOffset === null) {
+        // In video time, manager navigation starts after:
+        //   staffVideoOffset + introDuration + all previous staff step durations + pauses
+        // Then add NAVIGATION_TIME + MANAGER_PAGE_LOAD_TIME for when manager page content is actually visible
+        const staffStepsBeforeManager = timeline
+          .filter((s) => s.role === "STAFF" && s.stepNumber < step.stepNumber)
+          .reduce((sum, s) => sum + s.duration + 1, 0); // +1 for pause between steps
+
+        const videoTimeManagerNavigates =
+          staffVideoOffset + introDuration + staffStepsBeforeManager;
+        const videoTimeManagerContentVisible =
+          videoTimeManagerNavigates + NAVIGATION_TIME + MANAGER_PAGE_LOAD_TIME;
+
+        // Offset = video time - audio time
+        managerVideoOffset = videoTimeManagerContentVisible - step.startTime;
+        console.log(
+          `  Manager offset: ${managerVideoOffset.toFixed(2)}s (content visible at ${videoTimeManagerContentVisible.toFixed(2)}s in video)`
+        );
+      }
+
+      segments.push({
+        role: step.role,
+        videoPath: managerVideo!,
+        startTime: step.startTime,
+        endTime: step.endTime,
+        trimStart: step.startTime + managerVideoOffset,
+        trimEnd: step.endTime + managerVideoOffset,
+      });
     } else {
-      staffOffset += step.duration + 1;
+      // Staff steps: use staff video offset
+      segments.push({
+        role: step.role,
+        videoPath: staffVideo,
+        startTime: step.startTime,
+        endTime: step.endTime,
+        trimStart: step.startTime + staffVideoOffset,
+        trimEnd: step.endTime + staffVideoOffset,
+      });
     }
   }
 
