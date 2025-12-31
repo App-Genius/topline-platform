@@ -18,7 +18,14 @@ interface TestFlow {
   id: string;
   name: string;
   folder: string;
+  videoFile: string;
   verifications: unknown[];
+}
+
+function findVideoFile(folderPath: string): string | null {
+  const files = fs.readdirSync(folderPath);
+  const videoFile = files.find((f) => f.endsWith(".webm") || f.endsWith(".mp4"));
+  return videoFile || null;
 }
 
 function findTestFolders(): TestFlow[] {
@@ -29,11 +36,14 @@ function findTestFolders(): TestFlow[] {
 
   const folders = fs.readdirSync(TEST_RESULTS_DIR).filter((f) => {
     const fullPath = path.join(TEST_RESULTS_DIR, f);
-    return fs.statSync(fullPath).isDirectory() && fs.existsSync(path.join(fullPath, "video.webm"));
+    if (!fs.statSync(fullPath).isDirectory()) return false;
+    // Check if folder has any video file (*.webm or *.mp4)
+    return findVideoFile(fullPath) !== null;
   });
 
   return folders.map((folder, idx) => {
-    const verificationPath = path.join(TEST_RESULTS_DIR, folder, "verifications.json");
+    const folderPath = path.join(TEST_RESULTS_DIR, folder);
+    const verificationPath = path.join(folderPath, "verifications.json");
     let verifications: unknown[] = [];
 
     if (fs.existsSync(verificationPath)) {
@@ -44,9 +54,14 @@ function findTestFolders(): TestFlow[] {
       }
     }
 
+    // Find the actual video filename
+    const videoFile = findVideoFile(folderPath) || "video.webm";
+
     // Extract a readable name from the folder
     let name = folder;
-    if (folder.includes("briefing-journey") || folder.includes("attendance")) {
+    if (folder.includes("behavior-verification")) {
+      name = "Behavior Verification Flow (Multi-Role)";
+    } else if (folder.includes("briefing-journey") || folder.includes("attendance")) {
       name = "Daily Briefing Journey (6 Steps)";
     } else if (folder.includes("setup-form") || folder.includes("baseline")) {
       name = "Baseline Setup Form";
@@ -58,6 +73,7 @@ function findTestFolders(): TestFlow[] {
       id: `test-${idx}`,
       name,
       folder,
+      videoFile,
       verifications,
     };
   });
@@ -503,7 +519,7 @@ function generateHTML(tests: TestFlow[]): string {
       const test = tests.find(t => t.id === testId);
       if (!test) return;
 
-      mainVideo.src = test.folder + '/video.webm';
+      mainVideo.src = test.folder + '/' + test.videoFile;
       mainVideo.load();
 
       currentVerifications = test.verifications || [];

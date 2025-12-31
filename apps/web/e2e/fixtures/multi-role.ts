@@ -175,15 +175,21 @@ type MultiRoleFixtures = {
  *   });
  */
 export const test = base.extend<MultiRoleFixtures>({
-  // Staff context - isolated session for staff user
-  staffContext: async ({ browser }, use) => {
-    const context = await browser.newContext();
+  // Staff context - isolated session for staff user (with video recording)
+  staffContext: async ({ browser }, use, testInfo) => {
+    const context = await browser.newContext({
+      recordVideo: {
+        dir: testInfo.outputDir,
+        size: { width: 1920, height: 1080 },
+      },
+    });
     await use(context);
     await context.close();
   },
 
   // Manager context - isolated session for manager user
   managerContext: async ({ browser }, use) => {
+    // Manager context doesn't need its own video - staff context records the primary view
     const context = await browser.newContext();
     await use(context);
     await context.close();
@@ -191,6 +197,7 @@ export const test = base.extend<MultiRoleFixtures>({
 
   // Admin context - isolated session for admin user
   adminContext: async ({ browser }, use) => {
+    // Admin context doesn't need its own video
     const context = await browser.newContext();
     await use(context);
     await context.close();
