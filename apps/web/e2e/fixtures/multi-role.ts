@@ -187,18 +187,28 @@ export const test = base.extend<MultiRoleFixtures>({
     await context.close();
   },
 
-  // Manager context - isolated session for manager user
-  managerContext: async ({ browser }, use) => {
-    // Manager context doesn't need its own video - staff context records the primary view
-    const context = await browser.newContext();
+  // Manager context - isolated session for manager user (with video recording for multi-role merge)
+  managerContext: async ({ browser }, use, testInfo) => {
+    // Manager context also records video for multi-role video merging
+    const context = await browser.newContext({
+      recordVideo: {
+        dir: testInfo.outputDir,
+        size: { width: 1920, height: 1080 },
+      },
+    });
     await use(context);
     await context.close();
   },
 
-  // Admin context - isolated session for admin user
-  adminContext: async ({ browser }, use) => {
-    // Admin context doesn't need its own video
-    const context = await browser.newContext();
+  // Admin context - isolated session for admin user (with video recording for multi-role merge)
+  adminContext: async ({ browser }, use, testInfo) => {
+    // Admin context also records video for multi-role video merging
+    const context = await browser.newContext({
+      recordVideo: {
+        dir: testInfo.outputDir,
+        size: { width: 1920, height: 1080 },
+      },
+    });
     await use(context);
     await context.close();
   },

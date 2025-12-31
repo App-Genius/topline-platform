@@ -13,12 +13,86 @@
  */
 
 import * as fs from "fs/promises";
+import * as fsSync from "fs";
 import * as path from "path";
 import * as yaml from "yaml";
 
 // Paths
 const SPECS_DIR = path.join(__dirname, "..", "specs");
 const FLOWS_DIR = path.join(__dirname, "..", "flows");
+const AUDIO_DIR = path.join(__dirname, "..", "audio");
+const NARRATION_CACHE = path.join(AUDIO_DIR, ".narration-cache.json");
+
+// ============================================================================
+// CUE POINT TYPES AND LOADING
+// ============================================================================
+
+interface CuePoint {
+  timestamp: number;
+  actionIndex: number;
+  phrase: string;
+  selector: string;
+  type: "click" | "fill";
+}
+
+interface NarrationCacheEntry {
+  hash: string;
+  file: string;
+  text: string;
+  duration: number;
+  role: string | null;
+  step: number;
+  type: string;
+  cuePoints: CuePoint[];
+}
+
+interface NarrationCache {
+  [key: string]: NarrationCacheEntry;
+}
+
+/**
+ * Load narration cache with cue point metadata
+ */
+function loadNarrationCache(): NarrationCache {
+  try {
+    if (fsSync.existsSync(NARRATION_CACHE)) {
+      const content = fsSync.readFileSync(NARRATION_CACHE, "utf-8");
+      return JSON.parse(content);
+    }
+  } catch (error) {
+    console.warn("Could not load narration cache:", error);
+  }
+  return {};
+}
+
+/**
+ * Get step timing data including cue points
+ */
+function getStepTiming(flowId: string, stepNum: number, cache: NarrationCache): {
+  duration: number;
+  cuePoints: CuePoint[];
+} {
+  const key = `${flowId}/step-${stepNum}`;
+  const entry = cache[key];
+
+  if (entry) {
+    return {
+      duration: entry.duration || 0,
+      cuePoints: entry.cuePoints || [],
+    };
+  }
+
+  return { duration: 0, cuePoints: [] };
+}
+
+/**
+ * Get intro duration
+ */
+function getIntroDuration(flowId: string, cache: NarrationCache): number {
+  const key = `${flowId}/intro`;
+  const entry = cache[key];
+  return entry?.duration || 0;
+}
 
 // ============================================================================
 // TYPES
@@ -249,6 +323,13 @@ function generateTestFile(spec: FlowSpec): string {
     rolePageMap[role.type] = role.fixture;
   }
 
+  // Load narration cache for cue point timing
+  const narrationCache = loadNarrationCache();
+  const hasNarrationData = Object.keys(narrationCache).some(key => key.startsWith(flow.id));
+  if (hasNarrationData) {
+    console.log(`  Using cue points from narration cache for: ${flow.id}`);
+  }
+
   const lines: string[] = [];
 
   // Header
@@ -369,38 +450,73 @@ function generateTestFile(spec: FlowSpec): string {
       }
     }
 
-    // 2. NARRATION WAIT: User sees page while audio explains
+    // 2. CUE POINT SYNCHRONIZED EXECUTION
+    // Actions execute at their calculated timestamps WHILE narration describes them
+    const stepTiming = getStepTiming(flow.id, stepNum, narrationCache);
+    const hasCuePoints = stepTiming.cuePoints.length > 0;
+
     if (i === 0) {
-      // First step: wait for INTRO + STEP 1 narration
+      // First step: wait for intro first
       lines.push(`${indent}// Wait for intro narration (user sees page while intro plays)`);
-      lines.push(`${indent}if (introDuration > 0) {`);
-      lines.push(`${indent}  await page.waitForTimeout(introDuration);`);
-      lines.push(`${indent}}`);
-      lines.push(``);
-      lines.push(`${indent}// Wait for step narration (user sees page while step is explained)`);
-      lines.push(`${indent}if (step${stepNum}Duration > 0) {`);
-      lines.push(`${indent}  await page.waitForTimeout(step${stepNum}Duration);`);
-      lines.push(`${indent}}`);
-      lines.push(``);
-    } else {
-      // Subsequent steps: wait for step narration BEFORE actions
-      lines.push(`${indent}// Wait for step narration (user sees page while step is explained)`);
-      lines.push(`${indent}if (step${stepNum}Duration > 0) {`);
-      lines.push(`${indent}  await page.waitForTimeout(step${stepNum}Duration);`);
+      lines.push(`${indent}const introMs = ${Math.round(getIntroDuration(flow.id, narrationCache) * 1000)};`);
+      lines.push(`${indent}if (introMs > 0) {`);
+      lines.push(`${indent}  await page.waitForTimeout(introMs);`);
       lines.push(`${indent}}`);
       lines.push(``);
     }
 
-    // 3. INTERACTIVE ACTIONS: User sees taps/fills happen on screen
-    if (interactiveActions.length > 0) {
-      lines.push(`${indent}// Interactive: User sees these actions happen`);
-      for (const action of interactiveActions) {
-        lines.push(generateActionCode(action, indent));
-        // Add pause after clicks and fills so viewer can see them
-        if (action.type === "click" || action.type === "fill") {
-          lines.push(`${indent}await page.waitForTimeout(500); // Pause so viewer sees the action`);
-        }
+    if (hasCuePoints) {
+      // Use cue points for precise action timing
+      lines.push(`${indent}// Execute actions at cue point timestamps (synchronized with narration)`);
+      lines.push(`${indent}const stepStartTime = Date.now();`);
+      lines.push(`${indent}const stepDurationMs = ${Math.round(stepTiming.duration * 1000)};`);
+      lines.push(``);
+
+      for (const cue of stepTiming.cuePoints) {
+        const actionIndex = cue.actionIndex;
+        const action = allActions[actionIndex];
+        if (!action) continue;
+
+        lines.push(`${indent}// Cue point [${cue.timestamp.toFixed(2)}s]: "${cue.phrase}"`);
+        lines.push(`${indent}{`);
+        lines.push(`${indent}  const targetMs = ${Math.round(cue.timestamp * 1000)};`);
+        lines.push(`${indent}  const elapsed = Date.now() - stepStartTime;`);
+        lines.push(`${indent}  if (elapsed < targetMs) {`);
+        lines.push(`${indent}    await page.waitForTimeout(targetMs - elapsed);`);
+        lines.push(`${indent}  }`);
+        lines.push(generateActionCode(action, `${indent}  `));
+        lines.push(`${indent}  await page.waitForTimeout(300); // Brief pause to see action`);
+        lines.push(`${indent}}`);
         lines.push(``);
+      }
+
+      // Wait for remaining audio duration
+      lines.push(`${indent}// Wait for remaining narration`);
+      lines.push(`${indent}{`);
+      lines.push(`${indent}  const elapsed = Date.now() - stepStartTime;`);
+      lines.push(`${indent}  const remaining = stepDurationMs - elapsed;`);
+      lines.push(`${indent}  if (remaining > 0) await page.waitForTimeout(remaining);`);
+      lines.push(`${indent}}`);
+      lines.push(``);
+    } else {
+      // No cue points - wait for narration then do actions sequentially
+      lines.push(`${indent}// Wait for step narration (no cue points - sequential execution)`);
+      lines.push(`${indent}const stepDurationMs = ${Math.round(stepTiming.duration * 1000)};`);
+      lines.push(`${indent}if (stepDurationMs > 0) {`);
+      lines.push(`${indent}  await page.waitForTimeout(stepDurationMs);`);
+      lines.push(`${indent}}`);
+      lines.push(``);
+
+      // Execute any interactive actions after narration
+      if (interactiveActions.length > 0) {
+        lines.push(`${indent}// Interactive actions (after narration)`);
+        for (const action of interactiveActions) {
+          lines.push(generateActionCode(action, indent));
+          if (action.type === "click" || action.type === "fill") {
+            lines.push(`${indent}await page.waitForTimeout(500);`);
+          }
+          lines.push(``);
+        }
       }
     }
 

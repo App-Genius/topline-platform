@@ -18,6 +18,8 @@ import sys
 import yaml
 import hashlib
 import json
+import subprocess
+import re
 from pathlib import Path
 
 # Add the venv to path
@@ -61,6 +63,110 @@ def hash_text(text: str) -> str:
     return hashlib.md5(text.encode()).hexdigest()
 
 
+def get_audio_duration(file_path: Path) -> float:
+    """Get audio duration in seconds using ffprobe."""
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "quiet",
+                "-show_entries", "format=duration",
+                "-of", "csv=p=0",
+                str(file_path)
+            ],
+            capture_output=True,
+            text=True
+        )
+        return float(result.stdout.strip())
+    except Exception:
+        return 0.0
+
+
+def calculate_cue_points(narration_text: str, audio_duration: float, actions: list) -> list:
+    """
+    Calculate cue points for actions based on their position in narration text.
+
+    Algorithm:
+    1. Calculate speaking rate (chars/second)
+    2. Find where each action is described in the narration
+    3. Calculate timestamp from character position
+    """
+    if not narration_text or audio_duration <= 0:
+        return []
+
+    chars_per_second = len(narration_text) / audio_duration
+    cue_points = []
+    used_positions = []
+
+    for i, action in enumerate(actions):
+        action_type = action.get("type", "")
+        if action_type not in ["click", "fill"]:
+            continue
+
+        selector = action.get("selector", "")
+        # Extract text from selector (e.g., "text=Upsell Wine" -> "Upsell Wine")
+        selector_text = re.sub(r'^text=', '', selector).strip('"\'')
+
+        # Generate phrases that might describe this action
+        phrases = []
+        if action_type == "click":
+            phrases = [
+                f"taps the {selector_text}",
+                f"clicks the {selector_text}",
+                f"taps {selector_text}",
+                f"clicks {selector_text}",
+                f"click the {selector_text}",
+                f"tap the {selector_text}",
+                selector_text.lower()
+            ]
+            # Handle confirmation patterns
+            if "again" in selector_text.lower() or "confirm" in selector_text.lower():
+                phrases = [
+                    "confirms with a second tap",
+                    "confirms the action",
+                    "taps again",
+                    "second tap"
+                ] + phrases
+
+        # Find phrase in narration
+        lower_narration = narration_text.lower()
+        found = False
+
+        for phrase in phrases:
+            pos = lower_narration.find(phrase.lower())
+            # Skip if position already used
+            while pos >= 0 and pos in used_positions:
+                pos = lower_narration.find(phrase.lower(), pos + 1)
+
+            if pos >= 0:
+                timestamp = pos / chars_per_second
+                cue_points.append({
+                    "timestamp": round(timestamp, 2),
+                    "actionIndex": i,
+                    "phrase": phrase,
+                    "selector": selector,
+                    "type": action_type
+                })
+                used_positions.append(pos)
+                found = True
+                break
+
+        # Fallback: estimate based on action order
+        if not found and selector:
+            interactive_count = len([a for a in actions if a.get("type") in ["click", "fill"]])
+            position = len(cue_points) / max(interactive_count, 1)
+            estimated = (audio_duration * 0.3) + (position * audio_duration * 0.5)
+            cue_points.append({
+                "timestamp": round(estimated, 2),
+                "actionIndex": i,
+                "phrase": f"[estimated: {selector}]",
+                "selector": selector,
+                "type": action_type
+            })
+
+    # Sort by timestamp
+    return sorted(cue_points, key=lambda c: c["timestamp"])
+
+
 def load_spec(spec_name: str) -> dict:
     """Load a YAML flow specification."""
     spec_path = SPECS_DIR / f"{spec_name}.yaml"
@@ -72,7 +178,7 @@ def load_spec(spec_name: str) -> dict:
 
 
 def extract_narrations(spec: dict) -> list[dict]:
-    """Extract all narration texts from a flow spec."""
+    """Extract all narration texts from a flow spec, including actions for cue points."""
     narrations = []
     flow_id = spec["flow"]["id"]
 
@@ -82,7 +188,9 @@ def extract_narrations(spec: dict) -> list[dict]:
             "id": f"{flow_id}/intro",
             "text": spec["flow"]["narration"],
             "step": 0,
-            "type": "intro"
+            "type": "intro",
+            "role": None,
+            "actions": []
         })
 
     # Step-level narrations
@@ -93,10 +201,12 @@ def extract_narrations(spec: dict) -> list[dict]:
                 "id": f"{flow_id}/step-{i}",
                 "text": step["narration"],
                 "step": i,
-                "type": "step"
+                "type": "step",
+                "role": step.get("role", "UNKNOWN"),
+                "actions": step.get("actions", [])  # Include actions for cue point calculation
             })
 
-        # Action-level narrations
+        # Action-level narrations (less common)
         for j, action in enumerate(step.get("actions", []), 1):
             if "narration" in action:
                 narrations.append({
@@ -104,7 +214,9 @@ def extract_narrations(spec: dict) -> list[dict]:
                     "text": action["narration"],
                     "step": i,
                     "action": j,
-                    "type": "action"
+                    "type": "action",
+                    "role": step.get("role", "UNKNOWN"),
+                    "actions": [action]
                 })
 
     return narrations
@@ -115,11 +227,15 @@ def generate_narration_audio(narration: dict, output_dir: Path, cache: dict) -> 
     text = narration["text"]
     text_hash = hash_text(text)
     narration_id = narration["id"]
+    actions = narration.get("actions", [])
 
-    # Check cache
+    # Check cache - also verify cue points exist if there are actions
     if narration_id in cache and cache[narration_id]["hash"] == text_hash:
         output_file = Path(cache[narration_id]["file"])
-        if output_file.exists():
+        cached_has_cue_points = "cuePoints" in cache[narration_id]
+        needs_cue_points = len(actions) > 0 and any(a.get("type") in ["click", "fill"] for a in actions)
+
+        if output_file.exists() and (not needs_cue_points or cached_has_cue_points):
             print(f"  [cached] {narration_id}")
             return False
 
@@ -127,6 +243,9 @@ def generate_narration_audio(narration: dict, output_dir: Path, cache: dict) -> 
     output_dir.mkdir(parents=True, exist_ok=True)
     file_prefix = narration_id.replace("/", "-")
     output_path = output_dir / f"{file_prefix}.wav"
+
+    # Find actual output file (MLX-Audio appends _000)
+    actual_output = output_dir / f"{file_prefix}_000.wav"
 
     print(f"  [generating] {narration_id}: \"{text[:50]}...\"" if len(text) > 50 else f"  [generating] {narration_id}: \"{text}\"")
 
@@ -143,11 +262,28 @@ def generate_narration_audio(narration: dict, output_dir: Path, cache: dict) -> 
             verbose=False
         )
 
-        # Update cache
+        # Get audio duration
+        duration = get_audio_duration(actual_output)
+
+        # Calculate cue points for step narrations with actions
+        cue_points = []
+        if actions and duration > 0:
+            cue_points = calculate_cue_points(text, duration, actions)
+            if cue_points:
+                print(f"    [cue points] {len(cue_points)} action(s) timed:")
+                for cp in cue_points:
+                    print(f"      [{cp['timestamp']:.2f}s] {cp['type']}: {cp['phrase']}")
+
+        # Update cache with all metadata
         cache[narration_id] = {
             "hash": text_hash,
-            "file": str(output_path),
-            "text": text
+            "file": str(actual_output),
+            "text": text,
+            "duration": round(duration, 3),
+            "role": narration.get("role"),
+            "step": narration.get("step"),
+            "type": narration.get("type"),
+            "cuePoints": cue_points
         }
         return True
     except Exception as e:
