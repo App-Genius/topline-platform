@@ -73,7 +73,7 @@ const PERSONAS = [
 export default function DemoNav() {
   const pathname = usePathname();
   const { triggerScenario, industry, setIndustry } = useApp();
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState('owner');
 
   const activePersona = PERSONAS.find(p => p.id === activeTab) || PERSONAS[0];

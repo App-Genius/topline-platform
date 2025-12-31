@@ -23,8 +23,10 @@ export default defineConfig({
   use: {
     /* Base URL to use in actions like `await page.goto('/')` */
     baseURL: "http://localhost:3000",
-    /* Collect trace when retrying the failed test */
-    trace: "on-first-retry",
+    /* Record video of every test */
+    video: "on",
+    /* Collect trace for debugging */
+    trace: "on",
     /* Take screenshot on failure */
     screenshot: "only-on-failure",
   },
@@ -58,7 +60,7 @@ export default defineConfig({
   webServer: {
     command: "npm run dev",
     url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
     timeout: 120 * 1000,
   },
 });

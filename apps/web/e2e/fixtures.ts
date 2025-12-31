@@ -22,32 +22,33 @@ async function createTestSessionToken(payload: {
     .sign(SESSION_SECRET);
 }
 
-// Mock data for tests - matches database structure
+// Mock data for tests - uses ACTUAL database IDs from AC Hotel seed
+// These IDs are created by: npm run db:seed:ac-hotel
 export const mockUser = {
-  id: "user-1",
-  email: "manager@demo.com",
-  name: "Demo Manager",
+  id: "cmjtia4ak000mp4agzwakylgo",  // Sarah Manager from AC Hotel seed
+  email: "sarah@achotel.com",
+  name: "Sarah Manager",
   avatar: null,
   isActive: true,
-  roleId: "role-1",
-  organizationId: "org-1",
+  roleId: "cmjtia41z0006p4agtcgbehjl",
+  organizationId: "cmjtia41t0000p4ag1ylq1zrw",
   role: {
-    id: "role-1",
-    name: "Manager",
-    type: "manager",
+    id: "cmjtia41z0006p4agtcgbehjl",
+    name: "Floor Manager",
+    type: "MANAGER",
     permissions: ["read", "write", "manage"],
   },
   organization: {
-    id: "org-1",
-    name: "Demo Restaurant",
-    industry: "RESTAURANT",
+    id: "cmjtia41t0000p4ag1ylq1zrw",
+    name: "AC Hotel",
+    industry: "HOSPITALITY",
   },
 };
 
 export const mockOrganization = {
-  id: "org-1",
-  name: "Demo Restaurant",
-  industry: "RESTAURANT",
+  id: "cmjtia41t0000p4ag1ylq1zrw",
+  name: "AC Hotel",
+  industry: "HOSPITALITY",
 };
 
 export const mockBriefing = {
