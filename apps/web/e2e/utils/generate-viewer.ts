@@ -78,8 +78,7 @@ function generateHTML(tests: TestFlow[]): string {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: #0f172a;
       color: #fff;
-      height: 100vh;
-      overflow: hidden;
+      min-height: 100vh;
     }
     header {
       background: rgba(15, 23, 42, 0.95);
@@ -88,8 +87,8 @@ function generateHTML(tests: TestFlow[]): string {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      position: fixed;
-      top: 0; left: 0; right: 0;
+      position: sticky;
+      top: 0;
       z-index: 100;
       backdrop-filter: blur(8px);
     }
@@ -108,6 +107,11 @@ function generateHTML(tests: TestFlow[]): string {
       align-items: center;
       justify-content: center;
       font-size: 18px;
+    }
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 24px;
     }
     .test-selector {
       display: flex;
@@ -135,33 +139,88 @@ function generateHTML(tests: TestFlow[]): string {
       outline: none;
       border-color: #3b82f6;
     }
-    .split-container {
+    .panel-stats {
       display: flex;
-      height: 100vh;
-      padding-top: 57px;
+      gap: 16px;
+      font-size: 13px;
     }
-    .video-panel {
-      flex: 0 0 70%;
-      background: #000;
-      display: flex;
-      flex-direction: column;
+    .stat { display: flex; align-items: center; gap: 4px; }
+    .stat-pass { color: #10b981; }
+    .stat-total { color: #94a3b8; }
+
+    /* Current Step Banner - Above Video */
+    .current-step-banner {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border-bottom: 1px solid #334155;
+      padding: 16px 24px;
+      min-height: 80px;
     }
-    .video-container {
-      flex: 1;
+    .step-indicator {
       display: flex;
       align-items: center;
-      justify-content: center;
-      padding: 16px;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .step-number {
+      background: #8b5cf6;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 12px;
+    }
+    .step-type {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+    .step-type.assertion { background: #10b981; color: #000; }
+    .step-type.action { background: #3b82f6; color: #fff; }
+    .step-type.navigation { background: #f59e0b; color: #000; }
+    .step-type.step { background: #8b5cf6; color: #fff; }
+    .step-timestamp {
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 12px;
+      color: #64748b;
+      margin-left: auto;
+    }
+    .step-description {
+      font-size: 18px;
+      font-weight: 500;
+      color: #f1f5f9;
+      line-height: 1.4;
+    }
+    .step-status {
+      margin-left: 12px;
+      font-size: 18px;
+    }
+    .step-status.pass { color: #10b981; }
+    .step-status.fail { color: #ef4444; }
+    .step-status.info { color: #3b82f6; }
+    .no-step {
+      color: #64748b;
+      font-size: 16px;
+    }
+
+    /* Video Section */
+    .video-section {
+      background: #000;
+      padding: 24px;
+    }
+    .video-container {
+      max-width: 1400px;
+      margin: 0 auto;
     }
     .video-container video {
-      max-width: 100%;
-      max-height: 100%;
-      border-radius: 8px;
+      width: 100%;
+      border-radius: 12px;
       box-shadow: 0 8px 32px rgba(0,0,0,0.4);
     }
     .video-controls {
-      padding: 16px;
-      background: rgba(0,0,0,0.8);
+      max-width: 1400px;
+      margin: 16px auto 0;
       display: flex;
       align-items: center;
       gap: 16px;
@@ -174,16 +233,16 @@ function generateHTML(tests: TestFlow[]): string {
     }
     .progress-bar {
       flex: 1;
-      height: 6px;
+      height: 8px;
       background: #334155;
-      border-radius: 3px;
+      border-radius: 4px;
       cursor: pointer;
       position: relative;
     }
     .progress-fill {
       height: 100%;
       background: #3b82f6;
-      border-radius: 3px;
+      border-radius: 4px;
       width: 0%;
       transition: width 0.1s linear;
     }
@@ -199,103 +258,13 @@ function generateHTML(tests: TestFlow[]): string {
       border-radius: 2px;
       transform: translateX(-50%);
     }
-    .verification-panel {
-      flex: 0 0 30%;
-      background: #1e293b;
-      border-left: 1px solid #334155;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    .panel-header {
-      padding: 16px 20px;
-      border-bottom: 1px solid #334155;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .panel-header h2 {
-      font-size: 14px;
-      font-weight: 600;
-      color: #e2e8f0;
-    }
-    .panel-stats {
-      display: flex;
-      gap: 16px;
-      font-size: 12px;
-    }
-    .stat { display: flex; align-items: center; gap: 4px; }
-    .stat-pass { color: #10b981; }
-    .stat-total { color: #94a3b8; }
-    .verification-list {
-      flex: 1;
-      overflow-y: auto;
-      padding: 8px 0;
-    }
-    .verification-entry {
-      padding: 12px 20px;
-      border-left: 3px solid transparent;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-    .verification-entry:hover { background: rgba(255,255,255,0.03); }
-    .verification-entry.active {
-      background: rgba(59, 130, 246, 0.15);
-      border-left-color: #3b82f6;
-    }
-    .verification-entry.is-step {
-      background: rgba(139, 92, 246, 0.1);
-      border-left-color: #8b5cf6;
-      margin-top: 8px;
-    }
-    .entry-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 4px;
-    }
-    .entry-timestamp {
-      font-family: 'SF Mono', Monaco, monospace;
-      font-size: 11px;
-      color: #64748b;
-      min-width: 48px;
-    }
-    .entry-type {
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
-    .entry-type.assertion { background: #10b981; color: #000; }
-    .entry-type.action { background: #3b82f6; color: #fff; }
-    .entry-type.navigation { background: #f59e0b; color: #000; }
-    .entry-type.step { background: #8b5cf6; color: #fff; }
-    .entry-description {
-      font-size: 13px;
-      color: #cbd5e1;
-      line-height: 1.4;
-    }
-    .entry-status { margin-left: auto; font-size: 14px; }
-    .status-pass::before { content: '✓'; color: #10b981; }
-    .status-fail::before { content: '✗'; color: #ef4444; }
-    .status-info::before { content: '●'; color: #3b82f6; }
+
     .empty-state {
       text-align: center;
       padding: 60px 40px;
       color: #64748b;
     }
     .empty-state h3 { margin-bottom: 12px; color: #94a3b8; }
-    .empty-state p { font-size: 13px; line-height: 1.6; }
-    @media (max-width: 1200px) {
-      .video-panel { flex: 0 0 60%; }
-      .verification-panel { flex: 0 0 40%; }
-    }
-    @media (max-width: 900px) {
-      .split-container { flex-direction: column; }
-      .video-panel, .verification-panel { flex: none; height: 50%; }
-      .verification-panel { border-left: none; border-top: 1px solid #334155; }
-    }
   </style>
 </head>
 <body>
@@ -304,42 +273,37 @@ function generateHTML(tests: TestFlow[]): string {
       <div class="logo-icon">T</div>
       <span>Topline Test Flow Viewer</span>
     </div>
-    <div class="test-selector">
-      <label for="test-select">Test Flow:</label>
-      <select id="test-select">
-        <option value="">Select a test...</option>
-      </select>
+    <div class="header-controls">
+      <div class="panel-stats">
+        <span class="stat stat-pass"><span id="stat-pass">0</span> passed</span>
+        <span class="stat stat-total"><span id="stat-total">0</span> total</span>
+      </div>
+      <div class="test-selector">
+        <label for="test-select">Test Flow:</label>
+        <select id="test-select">
+          <option value="">Select a test...</option>
+        </select>
+      </div>
     </div>
   </header>
 
-  <div class="split-container">
-    <div class="video-panel">
-      <div class="video-container">
-        <video id="main-video" controls>
-          <source src="" type="video/webm">
-        </video>
-      </div>
-      <div class="video-controls">
-        <span class="time" id="video-time">0:00 / 0:00</span>
-        <div class="progress-bar" id="progress-bar">
-          <div class="progress-fill" id="progress-fill"></div>
-          <div class="progress-markers" id="progress-markers"></div>
-        </div>
-      </div>
+  <!-- Current Step Banner -->
+  <div class="current-step-banner" id="current-step-banner">
+    <div class="no-step">Select a test flow to begin</div>
+  </div>
+
+  <!-- Video Section -->
+  <div class="video-section">
+    <div class="video-container">
+      <video id="main-video" controls>
+        <source src="" type="video/webm">
+      </video>
     </div>
-    <div class="verification-panel">
-      <div class="panel-header">
-        <h2>Verification Steps</h2>
-        <div class="panel-stats">
-          <span class="stat stat-pass"><span id="stat-pass">0</span> passed</span>
-          <span class="stat stat-total"><span id="stat-total">0</span> total</span>
-        </div>
-      </div>
-      <div class="verification-list" id="verification-list">
-        <div class="empty-state">
-          <h3>No test selected</h3>
-          <p>Select a test flow from the dropdown above</p>
-        </div>
+    <div class="video-controls">
+      <span class="time" id="video-time">0:00 / 0:00</span>
+      <div class="progress-bar" id="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+        <div class="progress-markers" id="progress-markers"></div>
       </div>
     </div>
   </div>
@@ -354,12 +318,13 @@ function generateHTML(tests: TestFlow[]): string {
     const progressBar = document.getElementById('progress-bar');
     const progressFill = document.getElementById('progress-fill');
     const progressMarkers = document.getElementById('progress-markers');
-    const verificationList = document.getElementById('verification-list');
+    const currentStepBanner = document.getElementById('current-step-banner');
     const statPass = document.getElementById('stat-pass');
     const statTotal = document.getElementById('stat-total');
 
     let currentVerifications = [];
     let videoDuration = 0;
+    let currentActiveIdx = -1;
 
     tests.forEach(test => {
       const option = document.createElement('option');
@@ -383,40 +348,17 @@ function generateHTML(tests: TestFlow[]): string {
       mainVideo.load();
 
       currentVerifications = test.verifications || [];
-      renderVerifications();
+      currentActiveIdx = -1;
       renderProgressMarkers();
+      updateCurrentStep();
+      updateStats();
     }
 
-    function renderVerifications() {
-      if (currentVerifications.length === 0) {
-        verificationList.innerHTML = '<div class="empty-state"><h3>No verification data</h3></div>';
-        statPass.textContent = '0';
-        statTotal.textContent = '0';
-        return;
-      }
-
+    function updateStats() {
       const assertions = currentVerifications.filter(v => v.type === 'assertion');
       const passed = assertions.filter(v => v.status === 'pass').length;
       statPass.textContent = passed;
       statTotal.textContent = assertions.length;
-
-      verificationList.innerHTML = currentVerifications.map((entry, idx) => \`
-        <div class="verification-entry \${entry.type === 'step' ? 'is-step' : ''}" data-idx="\${idx}" data-time="\${entry.timestamp}">
-          <div class="entry-header">
-            <span class="entry-timestamp">\${formatTime(entry.timestamp)}</span>
-            <span class="entry-type \${entry.type}">\${entry.type}</span>
-            <span class="entry-status status-\${entry.status}"></span>
-          </div>
-          <div class="entry-description">\${entry.description}</div>
-        </div>
-      \`).join('');
-
-      verificationList.querySelectorAll('.verification-entry').forEach(el => {
-        el.addEventListener('click', () => {
-          mainVideo.currentTime = parseInt(el.dataset.time) / 1000;
-          mainVideo.play();
-        });
-      });
     }
 
     function renderProgressMarkers() {
@@ -431,14 +373,42 @@ function generateHTML(tests: TestFlow[]): string {
       }).join('');
     }
 
-    function updateActiveVerification() {
+    function updateCurrentStep() {
       const currentMs = mainVideo.currentTime * 1000;
-      document.querySelectorAll('.verification-entry').forEach(el => {
-        const time = parseInt(el.dataset.time);
-        const isActive = time <= currentMs && time > currentMs - 2000;
-        el.classList.toggle('active', isActive);
-        if (isActive) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      });
+
+      // Find the current step (last one that started before current time)
+      let activeIdx = -1;
+      for (let i = currentVerifications.length - 1; i >= 0; i--) {
+        if (currentVerifications[i].timestamp <= currentMs) {
+          activeIdx = i;
+          break;
+        }
+      }
+
+      // Update banner if changed
+      if (activeIdx !== currentActiveIdx) {
+        currentActiveIdx = activeIdx;
+
+        if (activeIdx >= 0) {
+          const entry = currentVerifications[activeIdx];
+          const stepNum = entry.step || '';
+          const statusIcon = entry.status === 'pass' ? '✓' : entry.status === 'fail' ? '✗' : '●';
+
+          currentStepBanner.innerHTML = \`
+            <div class="step-indicator">
+              \${stepNum ? \`<span class="step-number">Step \${stepNum}</span>\` : ''}
+              <span class="step-type \${entry.type}">\${entry.type}</span>
+              <span class="step-timestamp">\${formatTime(entry.timestamp)}</span>
+            </div>
+            <div class="step-description">
+              \${entry.description}
+              <span class="step-status \${entry.status}">\${statusIcon}</span>
+            </div>
+          \`;
+        } else {
+          currentStepBanner.innerHTML = '<div class="no-step">Video starting...</div>';
+        }
+      }
     }
 
     function updateProgress() {
@@ -450,7 +420,7 @@ function generateHTML(tests: TestFlow[]): string {
 
     testSelect.addEventListener('change', (e) => { if (e.target.value) loadTest(e.target.value); });
     mainVideo.addEventListener('loadedmetadata', () => { videoDuration = mainVideo.duration; renderProgressMarkers(); updateProgress(); });
-    mainVideo.addEventListener('timeupdate', () => { updateActiveVerification(); updateProgress(); });
+    mainVideo.addEventListener('timeupdate', () => { updateCurrentStep(); updateProgress(); });
     progressBar.addEventListener('click', (e) => {
       const rect = progressBar.getBoundingClientRect();
       mainVideo.currentTime = ((e.clientX - rect.left) / rect.width) * videoDuration;
