@@ -1,5 +1,6 @@
 import { test as base, expect } from "@playwright/test";
 import { SignJWT } from "jose";
+import { CLICK_VISUALIZER_SCRIPT } from "./utils/click-visualizer";
 
 // Session secret - must match lib/auth/session.ts
 const SESSION_SECRET = new TextEncoder().encode(
@@ -149,6 +150,10 @@ export const mockInsights = {
  */
 export const test = base.extend<{ authenticatedPage: typeof base }>({
   page: async ({ page, context }, use) => {
+    // Inject click visualizer for visual test recordings
+    // Shows cursor position and click ripple effects in videos
+    await page.addInitScript(CLICK_VISUALIZER_SCRIPT);
+
     // Create a valid session token
     const sessionToken = await createTestSessionToken({
       userId: mockUser.id,

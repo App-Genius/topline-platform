@@ -54,6 +54,22 @@ export default defineConfig({
       name: "Mobile Safari",
       use: { ...devices["iPhone 12"] },
     },
+    /* High-quality recording for visual test flows */
+    {
+      name: "hq-recording",
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1920, height: 1080 },
+        video: {
+          mode: "on",
+          size: { width: 1920, height: 1080 },
+        },
+        trace: "on",
+        launchOptions: {
+          slowMo: 50, // Smoother visual experience
+        },
+      },
+    },
   ],
 
   /* Run your local dev server before starting the tests */

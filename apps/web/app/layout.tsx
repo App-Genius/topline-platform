@@ -5,7 +5,6 @@ import { AppProvider } from "@/context/AppContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import DemoNav from "@/components/DemoNav";
 import CelebrationOverlay from "@/components/CelebrationOverlay";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -30,7 +29,6 @@ export default function RootLayout({
                 {children}
               </ErrorBoundary>
               <CelebrationOverlay />
-              <DemoNav />
             </AppProvider>
           </AuthProvider>
         </QueryProvider>
