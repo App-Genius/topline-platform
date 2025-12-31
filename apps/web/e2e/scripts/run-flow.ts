@@ -22,11 +22,30 @@
 import { spawn } from "child_process";
 import * as path from "path";
 import * as fs from "fs/promises";
-import { createNarratedVideo } from "./create-narrated-video";
+import { mergeMultiRoleVideo } from "./merge-multi-role-video";
 
 // Paths
 const FLOWS_DIR = path.join(__dirname, "..", "flows");
 const SPECS_DIR = path.join(__dirname, "..", "specs");
+const TEST_RESULTS_DIR = path.join(process.cwd(), "test-results");
+
+/**
+ * Find the test result folder for a flow
+ */
+async function findTestResultFolder(flowId: string): Promise<string | null> {
+  try {
+    const folders = await fs.readdir(TEST_RESULTS_DIR);
+    const truncated = flowId.substring(0, 18);
+
+    const matchingFolder = folders.find((f) => {
+      return f.includes(flowId) || f.includes(truncated);
+    });
+
+    return matchingFolder ? path.join(TEST_RESULTS_DIR, matchingFolder) : null;
+  } catch {
+    return null;
+  }
+}
 
 interface Options {
   record: boolean;
@@ -236,12 +255,17 @@ async function main() {
 
     // Post-process: Create narrated video if both narrate and record are enabled
     if (options.narrate && options.record) {
-      console.log("Post-processing: Creating narrated video...");
-      const narratedPath = await createNarratedVideo(flowName);
-      if (narratedPath) {
-        console.log("");
-        console.log("✓ Narrated video created!");
-        console.log(`  ${narratedPath}`);
+      console.log("Post-processing: Creating multi-role narrated video...");
+      const testFolder = await findTestResultFolder(flowName);
+      if (testFolder) {
+        const narratedPath = await mergeMultiRoleVideo(flowName, testFolder);
+        if (narratedPath) {
+          console.log("");
+          console.log("✓ Narrated video created!");
+          console.log(`  ${narratedPath}`);
+        }
+      } else {
+        console.log("Could not find test result folder for post-processing");
       }
     }
 
