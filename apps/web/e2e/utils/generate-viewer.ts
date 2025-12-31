@@ -265,6 +265,132 @@ function generateHTML(tests: TestFlow[]): string {
       color: #64748b;
     }
     .empty-state h3 { margin-bottom: 12px; color: #94a3b8; }
+
+    /* Toggle Button */
+    .toggle-panel-btn {
+      background: #334155;
+      color: #fff;
+      border: 1px solid #475569;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .toggle-panel-btn:hover {
+      background: #475569;
+    }
+
+    /* Slide-out Panel */
+    .steps-panel {
+      position: fixed;
+      top: 0;
+      right: -400px;
+      width: 400px;
+      height: 100vh;
+      background: #1e293b;
+      border-left: 1px solid #334155;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      transition: right 0.3s ease;
+    }
+    .steps-panel.open {
+      right: 0;
+    }
+    .panel-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 150;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .panel-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .panel-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .panel-header h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+    .panel-close {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 4px 8px;
+      line-height: 1;
+    }
+    .panel-close:hover { color: #fff; }
+    .steps-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+    .step-entry {
+      padding: 12px 20px;
+      border-left: 3px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .step-entry:hover { background: rgba(255,255,255,0.03); }
+    .step-entry.active {
+      background: rgba(59, 130, 246, 0.15);
+      border-left-color: #3b82f6;
+    }
+    .step-entry.is-step {
+      background: rgba(139, 92, 246, 0.1);
+      border-left-color: #8b5cf6;
+    }
+    .step-entry-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .step-entry-time {
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 11px;
+      color: #64748b;
+      min-width: 48px;
+    }
+    .step-entry-type {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .step-entry-type.assertion { background: #10b981; color: #000; }
+    .step-entry-type.action { background: #3b82f6; color: #fff; }
+    .step-entry-type.navigation { background: #f59e0b; color: #000; }
+    .step-entry-type.step { background: #8b5cf6; color: #fff; }
+    .step-entry-desc {
+      font-size: 13px;
+      color: #cbd5e1;
+      line-height: 1.4;
+    }
+    .step-entry-status { margin-left: auto; font-size: 14px; }
+    .status-pass { color: #10b981; }
+    .status-fail { color: #ef4444; }
+    .status-info { color: #3b82f6; }
   </style>
 </head>
 <body>
@@ -284,8 +410,23 @@ function generateHTML(tests: TestFlow[]): string {
           <option value="">Select a test...</option>
         </select>
       </div>
+      <button class="toggle-panel-btn" id="toggle-panel-btn">
+        All Steps
+      </button>
     </div>
   </header>
+
+  <!-- Overlay for closing panel -->
+  <div class="panel-overlay" id="panel-overlay"></div>
+
+  <!-- Slide-out Steps Panel -->
+  <div class="steps-panel" id="steps-panel">
+    <div class="panel-header">
+      <h2>All Steps</h2>
+      <button class="panel-close" id="panel-close">&times;</button>
+    </div>
+    <div class="steps-list" id="steps-list"></div>
+  </div>
 
   <!-- Current Step Banner -->
   <div class="current-step-banner" id="current-step-banner">
@@ -321,10 +462,28 @@ function generateHTML(tests: TestFlow[]): string {
     const currentStepBanner = document.getElementById('current-step-banner');
     const statPass = document.getElementById('stat-pass');
     const statTotal = document.getElementById('stat-total');
+    const togglePanelBtn = document.getElementById('toggle-panel-btn');
+    const stepsPanel = document.getElementById('steps-panel');
+    const panelOverlay = document.getElementById('panel-overlay');
+    const panelClose = document.getElementById('panel-close');
+    const stepsList = document.getElementById('steps-list');
 
     let currentVerifications = [];
     let videoDuration = 0;
     let currentActiveIdx = -1;
+
+    // Panel toggle functions
+    function openPanel() {
+      stepsPanel.classList.add('open');
+      panelOverlay.classList.add('open');
+    }
+    function closePanel() {
+      stepsPanel.classList.remove('open');
+      panelOverlay.classList.remove('open');
+    }
+    togglePanelBtn.addEventListener('click', openPanel);
+    panelClose.addEventListener('click', closePanel);
+    panelOverlay.addEventListener('click', closePanel);
 
     tests.forEach(test => {
       const option = document.createElement('option');
@@ -350,8 +509,38 @@ function generateHTML(tests: TestFlow[]): string {
       currentVerifications = test.verifications || [];
       currentActiveIdx = -1;
       renderProgressMarkers();
+      renderStepsList();
       updateCurrentStep();
       updateStats();
+    }
+
+    function renderStepsList() {
+      if (currentVerifications.length === 0) {
+        stepsList.innerHTML = '<div class="empty-state"><p>No steps</p></div>';
+        return;
+      }
+
+      stepsList.innerHTML = currentVerifications.map((entry, idx) => {
+        const statusIcon = entry.status === 'pass' ? '✓' : entry.status === 'fail' ? '✗' : '●';
+        return \`
+          <div class="step-entry \${entry.type === 'step' ? 'is-step' : ''}" data-idx="\${idx}" data-time="\${entry.timestamp}">
+            <div class="step-entry-header">
+              <span class="step-entry-time">\${formatTime(entry.timestamp)}</span>
+              <span class="step-entry-type \${entry.type}">\${entry.type}</span>
+              <span class="step-entry-status status-\${entry.status}">\${statusIcon}</span>
+            </div>
+            <div class="step-entry-desc">\${entry.description}</div>
+          </div>
+        \`;
+      }).join('');
+
+      stepsList.querySelectorAll('.step-entry').forEach(el => {
+        el.addEventListener('click', () => {
+          mainVideo.currentTime = parseInt(el.dataset.time) / 1000;
+          mainVideo.play();
+          closePanel();
+        });
+      });
     }
 
     function updateStats() {
@@ -384,6 +573,14 @@ function generateHTML(tests: TestFlow[]): string {
           break;
         }
       }
+
+      // Update panel highlighting
+      document.querySelectorAll('.step-entry').forEach((el, idx) => {
+        el.classList.toggle('active', idx === activeIdx);
+        if (idx === activeIdx && stepsPanel.classList.contains('open')) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      });
 
       // Update banner if changed
       if (activeIdx !== currentActiveIdx) {
