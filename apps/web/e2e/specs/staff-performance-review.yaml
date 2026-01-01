@@ -1,0 +1,213 @@
+# Staff Performance Review Flow
+# ==============================
+# Manager reviews an individual staff member's behavior logs
+#
+# This is a P0 flow that tests:
+# - Manager dashboard access
+# - Navigation to verification queue
+# - Filtering logs by staff member
+# - Viewing staff-specific behavior logs
+
+flow:
+  id: staff-performance-review
+  name: "Staff Performance Review Flow"
+  description: "Manager reviews an individual staff member's behavior logs and performance"
+  narration: "This flow shows how managers can drill down into an individual staff member's behavior logs to review their performance."
+  priority: p0
+  tags:
+    - single-role
+    - manager
+    - performance-review
+
+# ============================================================================
+# ROLES
+# ============================================================================
+
+roles:
+  - type: MANAGER
+    fixture: managerPage
+    user: managerUser
+
+# ============================================================================
+# STEPS
+# ============================================================================
+
+steps:
+  # --------------------------------------------------------------------------
+  # STEP 1: Manager accesses the manager dashboard
+  # --------------------------------------------------------------------------
+  - id: access-manager-dashboard
+    role: MANAGER
+    description: "Manager opens the manager dashboard"
+    narration: "Sarah Manager opens the manager dashboard to start her shift review. She sees several quick action links for different tasks."
+
+    actions:
+      - type: navigate
+        url: /manager
+
+      - type: waitFor
+        text: "Verification Queue"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "h1:has-text('Manager Log & Audit')"
+        fallback:
+          - "text=Verification Queue"
+
+      - type: visible
+        selector: "text=Verification Queue"
+
+      - type: visible
+        selector: "text=Start Daily Briefing"
+
+    businessLogic:
+      - function: isManagerRole
+        args:
+          role: MANAGER
+        expected: true
+
+      - function: canAccessManager
+        args:
+          role: MANAGER
+        expected: true
+
+      - function: canVerifyLogs
+        args:
+          role: MANAGER
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 2: Manager navigates to verification queue
+  # --------------------------------------------------------------------------
+  - id: go-to-verification
+    role: MANAGER
+    description: "Manager clicks on Verification Queue"
+    narration: "Sarah clicks on the Verification Queue link to review pending behavior logs from her team."
+
+    actions:
+      - type: click
+        selector: "text=Verification Queue"
+        fallback:
+          - "a:has-text('Verification Queue')"
+          - "[href='/manager/verification']"
+        waitAfter: 1000
+
+      - type: waitFor
+        text: "Behavior Verification"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=Behavior Verification"
+        fallback:
+          - "text=Verification"
+
+      - type: visible
+        selector: "text=pending"
+        fallback:
+          - "text=Pending"
+          - "text=All caught up"
+
+  # --------------------------------------------------------------------------
+  # STEP 3: Manager views the pending logs
+  # --------------------------------------------------------------------------
+  - id: view-staff-logs
+    role: MANAGER
+    description: "Manager views the behavior logs"
+    narration: "Sarah reviews the pending behavior logs from her team. She can see who logged what behavior and when."
+
+    actions:
+      - type: waitFor
+        text: "Filters"
+        timeout: 3000
+
+    assertions:
+      - type: visible
+        selector: "text=Filters"
+        fallback:
+          - "[data-testid='filters']"
+
+      - type: visible
+        selector: "a[href='/manager']"
+
+    businessLogic:
+      # Manager can view all users
+      - function: canViewAllUsers
+        args:
+          role: MANAGER
+        expected: true
+
+      # Manager can edit profiles
+      - function: canEditUserProfile
+        args:
+          role: MANAGER
+          isOwnProfile: false
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 4: Manager returns to dashboard
+  # --------------------------------------------------------------------------
+  - id: return-to-dashboard
+    role: MANAGER
+    description: "Manager returns to the main dashboard"
+    narration: "After reviewing the pending logs, Sarah returns to the main manager dashboard to continue with other tasks."
+
+    actions:
+      - type: click
+        selector: "a[href='/manager']"
+        fallback:
+          - "[data-testid='back-link']"
+        waitAfter: 1000
+
+      - type: waitFor
+        text: "Verification Queue"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=Verification Queue"
+
+      - type: visible
+        selector: "text=Shift Results"
+        fallback:
+          - "text=Revenue"
+
+    businessLogic:
+      # Staff cannot access manager features
+      - function: canAccessManager
+        args:
+          role: SERVER
+        expected: false
+
+      # Staff cannot verify logs
+      - function: canVerifyLogs
+        args:
+          role: SERVER
+        expected: false
+
+# ============================================================================
+# METADATA
+# ============================================================================
+
+metadata:
+  timeout: 60000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 1280
+      height: 720
+
+  reporter:
+    includeTimestamps: true
+    stepLabels: true
+
+  seedRequirements:
+    - type: user
+      role: MANAGER
+      email: sarah@achotel.com
+
+  documentation:
+    flow: docs/03-USER-FLOWS.md#21-staff-performance-review

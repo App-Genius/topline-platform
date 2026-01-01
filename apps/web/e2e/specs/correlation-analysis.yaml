@@ -1,0 +1,189 @@
+# Correlation Analysis Flow
+# =========================
+# Admin views behavior-KPI correlations
+#
+# This is a P1 flow that tests:
+# - Admin access to business intelligence
+# - Viewing correlation charts
+# - Time range selection
+# - KPI cards display
+#
+# NOTE: The admin page shows behavior vs revenue correlations.
+
+flow:
+  id: correlation-analysis
+  name: "Correlation Analysis Flow"
+  description: "Admin views behavior-KPI correlations"
+  narration: "This flow demonstrates how an admin views correlations between behaviors and business KPIs."
+  priority: p1
+  tags:
+    - single-role
+    - admin
+    - analytics
+    - correlation
+
+# ============================================================================
+# ROLES
+# ============================================================================
+
+roles:
+  - type: ADMIN
+    fixture: adminPage
+    user: adminUser
+
+# ============================================================================
+# STEPS
+# ============================================================================
+
+steps:
+  # --------------------------------------------------------------------------
+  # STEP 1: Admin opens admin dashboard
+  # --------------------------------------------------------------------------
+  - id: open-admin-dashboard
+    role: ADMIN
+    description: "Admin opens the admin dashboard"
+    narration: "Joel opens the business intelligence dashboard to view correlations."
+
+    actions:
+      - type: navigate
+        url: /admin
+
+      - type: waitFor
+        text: "Business Intelligence"
+        timeout: 15000
+
+    assertions:
+      - type: visible
+        selector: "text=Business Intelligence"
+
+    businessLogic:
+      - function: isAdminRole
+        args:
+          role: ADMIN
+        expected: true
+
+      - function: canAccessAdmin
+        args:
+          role: ADMIN
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 2: Admin sees KPI cards
+  # --------------------------------------------------------------------------
+  - id: view-kpi-cards
+    role: ADMIN
+    description: "Admin views the KPI summary cards"
+    narration: "Joel sees the key performance indicators at a glance."
+
+    actions:
+      - type: waitFor
+        text: "Total Revenue"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=Total Revenue"
+
+      - type: visible
+        selector: "text=Behavior vs. Revenue"
+        fallback:
+          - "text=Correlation"
+
+    businessLogic:
+      - function: calculateAverageCheck
+        args:
+          revenue: 50000
+          covers: 1000
+        expected: 50
+
+      - function: calculateVariance
+        args:
+          actual: 55
+          target: 50
+        expected: 10
+
+  # --------------------------------------------------------------------------
+  # STEP 3: Admin sees time range selector
+  # --------------------------------------------------------------------------
+  - id: view-time-selector
+    role: ADMIN
+    description: "Admin sees the time range selector"
+    narration: "Joel can select different time ranges to analyze trends."
+
+    actions:
+      - type: waitFor
+        text: "30d"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=7d"
+
+      - type: visible
+        selector: "text=30d"
+
+      - type: visible
+        selector: "text=90d"
+
+    businessLogic:
+      - function: calculateProgress
+        args:
+          current: 30
+          target: 90
+        expected: 33.33
+
+  # --------------------------------------------------------------------------
+  # STEP 4: Admin sees analytics charts
+  # --------------------------------------------------------------------------
+  - id: view-analytics-charts
+    role: ADMIN
+    description: "Admin views the analytics visualization"
+    narration: "Joel sees charts showing revenue and behavior correlations over time."
+
+    actions:
+      - type: waitFor
+        text: "analytics"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=Real-time financial"
+        fallback:
+          - "text=analytics"
+
+    businessLogic:
+      - function: canAccessAdmin
+        args:
+          role: SERVER
+        expected: false
+
+      - function: canAccessAdmin
+        args:
+          role: MANAGER
+        expected: false
+
+# ============================================================================
+# METADATA
+# ============================================================================
+
+metadata:
+  timeout: 60000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 1280
+      height: 720
+
+  reporter:
+    includeTimestamps: true
+    stepLabels: true
+
+  seedRequirements:
+    - type: user
+      role: ADMIN
+      email: joel@achotel.com
+
+  documentation:
+    flow: docs/03-USER-FLOWS.md#correlation-analysis

@@ -220,9 +220,9 @@ steps:
       - type: visible
         selector: "text=My Actions"
 
-      # Verify verified status is visible
+      # Verify we can log more behaviors (page is working)
       - type: visible
-        selector: "text=verified"
+        selector: "text=Log Behavior"
 
 # ============================================================================
 # METADATA

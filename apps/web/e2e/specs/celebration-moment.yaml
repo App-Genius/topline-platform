@@ -1,0 +1,82 @@
+# Celebration Moment Flow
+# =======================
+# Scoreboard display celebrates wins
+#
+# This flow tests the scoreboard in winning state.
+
+flow:
+  id: celebration-moment
+  name: "Celebration Moment Flow"
+  description: "Scoreboard celebrates team wins"
+  narration: "This flow shows the scoreboard celebrating team achievements."
+  priority: p1
+  tags:
+    - single-role
+    - scoreboard
+    - celebration
+
+roles:
+  - type: STAFF
+    fixture: staffPage
+    user: staffUser
+
+steps:
+  - id: open-scoreboard
+    role: STAFF
+    description: "View the public scoreboard"
+    narration: "The team views the scoreboard on the TV display."
+
+    actions:
+      - type: navigate
+        url: /scoreboard
+
+      - type: waitFor
+        text: "Today's Revenue"
+        timeout: 10000
+
+    assertions:
+      - type: visible
+        selector: "text=Today's Revenue"
+
+    businessLogic:
+      - function: calculateProgress
+        args:
+          current: 85
+          target: 100
+        expected: 85
+
+  - id: view-leaderboard
+    role: STAFF
+    description: "View the team leaderboard"
+    narration: "Staff sees the team rankings."
+
+    actions:
+      - type: waitFor
+        text: "Team Behaviors"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=Team Behaviors"
+
+    businessLogic:
+      - function: calculateVariance
+        args:
+          actual: 110
+          target: 100
+        expected: 10
+
+metadata:
+  timeout: 60000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 1280
+      height: 720
+
+  seedRequirements:
+    - type: user
+      role: STAFF
+      email: mike@achotel.com

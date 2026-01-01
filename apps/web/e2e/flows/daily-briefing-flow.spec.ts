@@ -1,4 +1,4 @@
-import { test, expect } from "../fixtures";
+import { test, expect } from "../fixtures/multi-role";
 import { VerificationLogger } from "../utils/verification-logger";
 import * as fs from "fs/promises";
 import * as path from "path";
@@ -35,7 +35,7 @@ test.describe("Daily Briefing Flow - High Quality Recording", () => {
   });
 
   test("complete briefing journey: overview → VIP → kitchen → upsell → training → attendance", async ({
-    page,
+    managerPage: page,
   }) => {
     // Navigate to briefing page
     await page.goto("/manager/briefing");
@@ -221,7 +221,7 @@ test.describe("Setup Flow - High Quality Recording", () => {
     }
   });
 
-  test("baseline setup form interaction", async ({ page }) => {
+  test("baseline setup form interaction", async ({ managerPage: page }) => {
     await page.goto("/setup");
     logger.navigate("/setup");
     await page.waitForTimeout(1000);

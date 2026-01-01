@@ -1,0 +1,80 @@
+# Offline Sync Flow
+# =================
+# Staff logs behavior (simulated offline capability)
+#
+# This flow tests the behavior logging which supports offline mode.
+
+flow:
+  id: offline-sync
+  name: "Offline Sync Flow"
+  description: "Staff behavior logging supports offline mode"
+  narration: "This flow demonstrates behavior logging which can work offline."
+  priority: p1
+  tags:
+    - single-role
+    - staff
+    - offline
+
+roles:
+  - type: STAFF
+    fixture: staffPage
+    user: staffUser
+
+steps:
+  - id: open-staff-page
+    role: STAFF
+    description: "Staff opens their dashboard"
+    narration: "Mike opens the staff page."
+
+    actions:
+      - type: navigate
+        url: /staff
+
+      - type: waitFor
+        text: "Log Behavior"
+        timeout: 10000
+
+    assertions:
+      - type: visible
+        selector: "text=Log Behavior"
+
+    businessLogic:
+      - function: isStaffRole
+        args:
+          role: SERVER
+        expected: true
+
+  - id: view-behavior-buttons
+    role: STAFF
+    description: "Staff sees behavior logging buttons"
+    narration: "Mike sees the available behaviors to log."
+
+    actions:
+      - type: waitFor
+        text: "Recommend wine pairing"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "button:has-text('Recommend wine pairing')"
+
+    businessLogic:
+      - function: canVerifyLogs
+        args:
+          role: SERVER
+        expected: false
+
+metadata:
+  timeout: 60000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 1280
+      height: 720
+
+  seedRequirements:
+    - type: user
+      role: STAFF
+      email: mike@achotel.com

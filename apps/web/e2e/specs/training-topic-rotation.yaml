@@ -1,0 +1,81 @@
+# Training Topic Rotation Flow
+# ============================
+# Admin configures training topics
+#
+# This flow tests training topic suggestions in AI Insights.
+
+flow:
+  id: training-topic-rotation
+  name: "Training Topic Rotation Flow"
+  description: "Admin views training recommendations in AI Insights"
+  narration: "This flow shows how an admin views AI-suggested training topics."
+  priority: p1
+  tags:
+    - single-role
+    - admin
+    - training
+    - insights
+
+roles:
+  - type: ADMIN
+    fixture: adminPage
+    user: adminUser
+
+steps:
+  - id: open-insights
+    role: ADMIN
+    description: "Admin opens AI Insights"
+    narration: "Joel opens AI Insights to see training recommendations."
+
+    actions:
+      - type: navigate
+        url: /admin/insights
+
+      - type: waitFor
+        text: "Overall Health Score"
+        timeout: 10000
+
+    assertions:
+      - type: visible
+        selector: "text=Overall Health Score"
+
+    businessLogic:
+      - function: isAdminRole
+        args:
+          role: ADMIN
+        expected: true
+
+  - id: view-training-section
+    role: ADMIN
+    description: "Admin views training recommendations"
+    narration: "Joel sees the training topic suggestions."
+
+    actions:
+      - type: waitFor
+        text: "Improvement Opportunities"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=Improvement Opportunities"
+
+    businessLogic:
+      - function: canAccessAdmin
+        args:
+          role: ADMIN
+        expected: true
+
+metadata:
+  timeout: 60000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 1280
+      height: 720
+
+  seedRequirements:
+    - type: user
+      role: ADMIN
+      email: joel@achotel.com

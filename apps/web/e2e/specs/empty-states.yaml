@@ -1,0 +1,90 @@
+# Empty States Flow
+# =================
+# Admin views page with proper empty state handling
+#
+# This flow tests that pages handle empty data gracefully.
+
+flow:
+  id: empty-states
+  name: "Empty States Flow"
+  description: "Admin views pages that handle empty states"
+  narration: "This flow verifies that pages display helpful empty states."
+  priority: p1
+  tags:
+    - single-role
+    - admin
+    - ux
+    - empty-state
+
+roles:
+  - type: ADMIN
+    fixture: adminPage
+    user: adminUser
+
+steps:
+  - id: open-admin-console
+    role: ADMIN
+    description: "Admin opens the admin console"
+    narration: "Joel opens the admin console."
+
+    actions:
+      - type: navigate
+        url: /admin
+
+      - type: waitFor
+        text: "Admin Console"
+        timeout: 10000
+
+    assertions:
+      - type: visible
+        selector: "text=Admin Console"
+
+    businessLogic:
+      - function: isAdminRole
+        args:
+          role: ADMIN
+        expected: true
+
+  - id: view-users-page
+    role: ADMIN
+    description: "Admin navigates to users page"
+    narration: "Joel opens the users page to see team management."
+
+    actions:
+      - type: click
+        selector: "a[href='/admin/users']"
+        fallback:
+          - "text=Users"
+        waitAfter: 2000
+
+      - type: waitFor
+        text: "User Management"
+        timeout: 10000
+
+    assertions:
+      - type: visible
+        selector: "text=User Management"
+
+      - type: visible
+        selector: "text=Add User"
+
+    businessLogic:
+      - function: canAccessAdmin
+        args:
+          role: ADMIN
+        expected: true
+
+metadata:
+  timeout: 60000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 1280
+      height: 720
+
+  seedRequirements:
+    - type: user
+      role: ADMIN
+      email: joel@achotel.com

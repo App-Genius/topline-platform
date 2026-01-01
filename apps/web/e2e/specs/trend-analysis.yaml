@@ -1,0 +1,181 @@
+# Trend Analysis Flow
+# ====================
+# Admin views performance trends over time
+#
+# This is a P1 flow that tests:
+# - Admin access to AI insights
+# - Viewing performance trends
+# - Training and cost recommendations
+# - Insight sections navigation
+#
+# NOTE: The insights page shows AI-generated performance analysis.
+
+flow:
+  id: trend-analysis
+  name: "Trend Analysis Flow"
+  description: "Admin views performance trends over time"
+  narration: "This flow demonstrates how an admin views AI-generated performance trends and insights."
+  priority: p1
+  tags:
+    - single-role
+    - admin
+    - analytics
+    - insights
+
+# ============================================================================
+# ROLES
+# ============================================================================
+
+roles:
+  - type: ADMIN
+    fixture: adminPage
+    user: adminUser
+
+# ============================================================================
+# STEPS
+# ============================================================================
+
+steps:
+  # --------------------------------------------------------------------------
+  # STEP 1: Admin opens admin dashboard
+  # --------------------------------------------------------------------------
+  - id: open-admin-dashboard
+    role: ADMIN
+    description: "Admin opens the admin dashboard"
+    narration: "Joel opens the admin console to access insights."
+
+    actions:
+      - type: navigate
+        url: /admin
+
+      - type: waitFor
+        text: "Admin Console"
+        timeout: 15000
+
+    assertions:
+      - type: visible
+        selector: "text=Admin Console"
+
+      - type: visible
+        selector: "a[href='/admin/insights']"
+        fallback:
+          - "text=Insights"
+
+    businessLogic:
+      - function: isAdminRole
+        args:
+          role: ADMIN
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 2: Admin navigates to insights
+  # --------------------------------------------------------------------------
+  - id: navigate-to-insights
+    role: ADMIN
+    description: "Admin clicks on Insights in the sidebar"
+    narration: "Joel clicks on Insights to view AI-generated recommendations."
+
+    actions:
+      - type: click
+        selector: "a[href='/admin/insights']"
+        fallback:
+          - "text=Insights"
+        waitAfter: 2000
+
+      - type: waitFor
+        text: "Overall Health Score"
+        timeout: 10000
+
+    assertions:
+      - type: visible
+        selector: "text=Overall Health Score"
+
+    businessLogic:
+      - function: canAccessAdmin
+        args:
+          role: ADMIN
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 3: Admin sees insight sections
+  # --------------------------------------------------------------------------
+  - id: view-insight-sections
+    role: ADMIN
+    description: "Admin sees the available insight categories"
+    narration: "Joel sees different categories of insights including training and costs."
+
+    actions:
+      - type: waitFor
+        text: "Improvement Opportunities"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=Improvement Opportunities"
+
+      - type: visible
+        selector: "text=Recommended Actions"
+
+    businessLogic:
+      - function: calculateProgress
+        args:
+          current: 75
+          target: 100
+        expected: 75
+
+  # --------------------------------------------------------------------------
+  # STEP 4: Admin sees refresh capability
+  # --------------------------------------------------------------------------
+  - id: view-refresh-capability
+    role: ADMIN
+    description: "Admin can refresh the insights"
+    narration: "Joel can request updated AI insights by clicking refresh."
+
+    actions:
+      - type: waitFor
+        text: "Refresh Insights"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "button:has-text('Refresh Insights')"
+
+      - type: visible
+        selector: "text=Updated"
+
+    businessLogic:
+      - function: canAccessAdmin
+        args:
+          role: SERVER
+        expected: false
+
+      - function: canAccessAdmin
+        args:
+          role: MANAGER
+        expected: false
+
+# ============================================================================
+# METADATA
+# ============================================================================
+
+metadata:
+  timeout: 60000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 1280
+      height: 720
+
+  reporter:
+    includeTimestamps: true
+    stepLabels: true
+
+  seedRequirements:
+    - type: user
+      role: ADMIN
+      email: joel@achotel.com
+
+  documentation:
+    flow: docs/03-USER-FLOWS.md#trend-analysis

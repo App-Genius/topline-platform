@@ -139,6 +139,7 @@ export {
   getVerificationUpdate,
   canAccessOrganization,
   canAccessFeature,
+  canUsePinLogin,
   getAllowedRoutes,
   getUnauthorizedRedirect,
 } from './rbac';

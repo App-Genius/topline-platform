@@ -1,0 +1,150 @@
+# Export Reports Flow
+# ====================
+# Admin can export analytics data
+#
+# This is a P1 flow that tests:
+# - Admin access to analytics
+# - Time range selection capability
+# - Data export readiness (charts visible)
+#
+# NOTE: This flow verifies export prerequisites by checking analytics display.
+
+flow:
+  id: export-reports
+  name: "Export Reports Flow"
+  description: "Admin prepares analytics data for export"
+  narration: "This flow demonstrates how an admin views analytics data that can be exported."
+  priority: p1
+  tags:
+    - single-role
+    - admin
+    - analytics
+    - export
+
+# ============================================================================
+# ROLES
+# ============================================================================
+
+roles:
+  - type: ADMIN
+    fixture: adminPage
+    user: adminUser
+
+# ============================================================================
+# STEPS
+# ============================================================================
+
+steps:
+  # --------------------------------------------------------------------------
+  # STEP 1: Admin opens admin dashboard
+  # --------------------------------------------------------------------------
+  - id: open-admin-dashboard
+    role: ADMIN
+    description: "Admin opens the admin dashboard"
+    narration: "Joel opens the business intelligence dashboard to prepare an export."
+
+    actions:
+      - type: navigate
+        url: /admin
+
+      - type: waitFor
+        text: "Business Intelligence"
+        timeout: 15000
+
+    assertions:
+      - type: visible
+        selector: "text=Business Intelligence"
+
+    businessLogic:
+      - function: isAdminRole
+        args:
+          role: ADMIN
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 2: Admin selects time range
+  # --------------------------------------------------------------------------
+  - id: select-time-range
+    role: ADMIN
+    description: "Admin selects a time range for the report"
+    narration: "Joel selects a 90-day time range to get more comprehensive data."
+
+    actions:
+      - type: click
+        selector: "button:has-text('90d')"
+        fallback:
+          - "text=90d"
+        waitAfter: 1000
+
+      - type: waitFor
+        text: "Total Revenue"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=Total Revenue"
+
+      - type: visible
+        selector: "text=Behavior vs. Revenue"
+
+    businessLogic:
+      - function: calculateProgress
+        args:
+          current: 90
+          target: 365
+        expected: 24.66
+
+  # --------------------------------------------------------------------------
+  # STEP 3: Admin views chart data
+  # --------------------------------------------------------------------------
+  - id: view-chart-data
+    role: ADMIN
+    description: "Admin reviews the chart data"
+    narration: "Joel reviews the revenue and behavior correlation chart."
+
+    actions:
+      - type: waitFor
+        text: "Healthy Growth"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=Healthy Growth"
+
+    businessLogic:
+      - function: calculateVariance
+        args:
+          actual: 120
+          target: 100
+        expected: 20
+
+      - function: canAccessAdmin
+        args:
+          role: SERVER
+        expected: false
+
+# ============================================================================
+# METADATA
+# ============================================================================
+
+metadata:
+  timeout: 60000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 1280
+      height: 720
+
+  reporter:
+    includeTimestamps: true
+    stepLabels: true
+
+  seedRequirements:
+    - type: user
+      role: ADMIN
+      email: joel@achotel.com
+
+  documentation:
+    flow: docs/03-USER-FLOWS.md#export-reports

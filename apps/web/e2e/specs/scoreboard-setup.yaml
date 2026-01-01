@@ -1,0 +1,222 @@
+# Scoreboard Setup Flow
+# =====================
+# Admin configures the TV scoreboard display settings
+#
+# This is a P1 flow that tests:
+# - Admin access to settings
+# - Scoreboard metric configuration
+# - Display options toggling
+# - Preview link availability
+#
+# NOTE: This flow focuses on viewing and interacting with scoreboard settings.
+
+flow:
+  id: scoreboard-setup
+  name: "Scoreboard Setup Flow"
+  description: "Admin configures the TV scoreboard display"
+  narration: "This flow demonstrates how an admin configures the scoreboard for TV display."
+  priority: p1
+  tags:
+    - single-role
+    - admin
+    - settings
+    - scoreboard
+
+# ============================================================================
+# ROLES
+# ============================================================================
+
+roles:
+  - type: ADMIN
+    fixture: adminPage
+    user: adminUser
+
+# ============================================================================
+# STEPS
+# ============================================================================
+
+steps:
+  # --------------------------------------------------------------------------
+  # STEP 1: Admin opens admin dashboard
+  # --------------------------------------------------------------------------
+  - id: open-admin-dashboard
+    role: ADMIN
+    description: "Admin opens the admin dashboard"
+    narration: "Joel opens the admin console to configure the scoreboard."
+
+    actions:
+      - type: navigate
+        url: /admin
+
+      - type: waitFor
+        text: "Admin Console"
+        timeout: 15000
+
+    assertions:
+      - type: visible
+        selector: "text=Admin Console"
+
+      - type: visible
+        selector: "a[href='/admin/settings']"
+        fallback:
+          - "text=Settings"
+
+    businessLogic:
+      - function: isAdminRole
+        args:
+          role: ADMIN
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 2: Admin navigates to settings
+  # --------------------------------------------------------------------------
+  - id: navigate-to-settings
+    role: ADMIN
+    description: "Admin clicks on Settings in the sidebar"
+    narration: "Joel clicks on Settings to access the scoreboard configuration."
+
+    actions:
+      - type: click
+        selector: "a[href='/admin/settings']"
+        fallback:
+          - "text=Settings"
+        waitAfter: 2000
+
+      - type: waitFor
+        text: "Scoreboard Metrics"
+        timeout: 10000
+
+    assertions:
+      - type: visible
+        selector: "text=Scoreboard Metrics"
+
+      - type: visible
+        selector: "text=Display Options"
+
+    businessLogic:
+      - function: canAccessAdmin
+        args:
+          role: ADMIN
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 3: Admin views scoreboard metrics
+  # --------------------------------------------------------------------------
+  - id: view-scoreboard-metrics
+    role: ADMIN
+    description: "Admin sees the configurable scoreboard metrics"
+    narration: "Joel sees the list of metrics that can be displayed on the TV scoreboard."
+
+    actions:
+      - type: waitFor
+        text: "visible"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=Scoreboard Metrics"
+
+      - type: visible
+        selector: "text=Choose which metrics"
+
+    businessLogic:
+      - function: calculateProgress
+        args:
+          current: 80
+          target: 100
+        expected: 80
+
+      - function: calculateVariance
+        args:
+          actual: 110
+          target: 100
+        expected: 10
+
+  # --------------------------------------------------------------------------
+  # STEP 4: Admin sees display options
+  # --------------------------------------------------------------------------
+  - id: view-display-options
+    role: ADMIN
+    description: "Admin sees the display options for the scoreboard"
+    narration: "Joel sees the toggle options for leaderboard visibility and name anonymization."
+
+    actions:
+      - type: waitFor
+        text: "Show Leaderboard"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=Show Leaderboard"
+
+      - type: visible
+        selector: "text=Anonymize Names"
+
+      - type: visible
+        selector: "text=Refresh Interval"
+
+    businessLogic:
+      - function: isAdminRole
+        args:
+          role: ADMIN
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 5: Admin sees preview link
+  # --------------------------------------------------------------------------
+  - id: view-preview-link
+    role: ADMIN
+    description: "Admin sees the preview scoreboard link"
+    narration: "Joel can open a preview of the scoreboard to see how it looks on TV."
+
+    actions:
+      - type: waitFor
+        text: "Preview Scoreboard"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=Preview Scoreboard"
+
+      - type: visible
+        selector: "text=Open Preview"
+
+      - type: visible
+        selector: "a[href='/scoreboard']"
+
+    businessLogic:
+      - function: canAccessAdmin
+        args:
+          role: SERVER
+        expected: false
+
+      - function: canAccessAdmin
+        args:
+          role: MANAGER
+        expected: false
+
+# ============================================================================
+# METADATA
+# ============================================================================
+
+metadata:
+  timeout: 60000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 1280
+      height: 720
+
+  reporter:
+    includeTimestamps: true
+    stepLabels: true
+
+  seedRequirements:
+    - type: user
+      role: ADMIN
+      email: joel@achotel.com
+
+  documentation:
+    flow: docs/03-USER-FLOWS.md#scoreboard-setup

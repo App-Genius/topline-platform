@@ -1,0 +1,218 @@
+# PIN Login Flow
+# ===============
+# Staff authenticates using their profile and 4-digit PIN on a shared device
+#
+# This is a P0 flow that tests:
+# - Profile selection UI
+# - PIN entry keypad
+# - Authentication with PIN
+# - Redirect to staff dashboard on success
+# - Error handling for wrong PIN
+
+flow:
+  id: pin-login
+  name: "PIN Login Flow"
+  description: "Staff member authenticates using profile selection and 4-digit PIN on shared device"
+  narration: "This flow demonstrates the quick PIN login process for staff on shared tablets near the POS system."
+  priority: p0
+  tags:
+    - single-role
+    - authentication
+    - staff
+
+# ============================================================================
+# ROLES
+# ============================================================================
+
+roles:
+  - type: STAFF
+    fixture: staffPage
+    user: staffUser
+
+# ============================================================================
+# STEPS
+# ============================================================================
+
+steps:
+  # --------------------------------------------------------------------------
+  # STEP 1: Navigate to staff login page
+  # --------------------------------------------------------------------------
+  - id: navigate-to-login
+    role: STAFF
+    description: "Staff navigates to the staff login page"
+    narration: "A shared tablet at AC Hotel displays the staff login page. Multiple staff profiles are shown in a grid format for quick selection."
+
+    actions:
+      # Navigate to staff login page
+      - type: navigate
+        url: /staff/login
+
+      # Wait for profile grid to load
+      - type: waitFor
+        text: "Select Your Profile"
+        timeout: 5000
+
+    assertions:
+      # Verify profile grid is visible
+      - type: visible
+        selector: "[data-testid='profile-grid']"
+
+    businessLogic:
+      # Staff roles can use PIN login
+      - function: canUsePinLogin
+        args:
+          role: SERVER
+        expected: true
+
+      # Admin typically cannot use PIN login
+      - function: canUsePinLogin
+        args:
+          role: ADMIN
+        expected: false
+
+  # --------------------------------------------------------------------------
+  # STEP 2: Select staff profile
+  # --------------------------------------------------------------------------
+  - id: select-profile
+    role: STAFF
+    description: "Staff selects their profile from the grid"
+    narration: "Sam taps on his profile avatar in the grid. The screen transitions to show a PIN entry keypad with his name displayed at the top."
+
+    actions:
+      # Click on Sam's profile
+      - type: click
+        selector: "[data-testid='profile-sam']"
+        fallback:
+          - "text=Sam"
+          - "button:has-text('Sam')"
+        waitAfter: 500
+
+      # Wait for PIN entry screen
+      - type: waitFor
+        text: "Enter Your PIN"
+        timeout: 3000
+
+    assertions:
+      # Verify PIN keypad is visible
+      - type: visible
+        selector: "[data-testid='pin-keypad']"
+
+      # Verify PIN dots are visible
+      - type: visible
+        selector: "[data-testid='pin-dots']"
+
+    businessLogic:
+      # Staff role is correctly classified
+      - function: isStaffRole
+        args:
+          role: SERVER
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 3: Enter PIN (wrong PIN first - edge case)
+  # --------------------------------------------------------------------------
+  - id: enter-wrong-pin
+    role: STAFF
+    description: "Staff enters an incorrect PIN to test error handling"
+    narration: "Sam mistakenly enters the wrong PIN. The screen shakes briefly and shows an error message asking him to try again."
+
+    actions:
+      # Enter wrong PIN digits
+      - type: click
+        selector: "button:has-text('9')"
+        waitAfter: 100
+      - type: click
+        selector: "button:has-text('9')"
+        waitAfter: 100
+      - type: click
+        selector: "button:has-text('9')"
+        waitAfter: 100
+      - type: click
+        selector: "button:has-text('9')"
+        waitAfter: 1500
+
+      # Wait for error message
+      - type: waitFor
+        text: "Incorrect PIN"
+        timeout: 3000
+
+    assertions:
+      # Verify error message is shown
+      - type: visible
+        selector: "[data-testid='pin-error']"
+
+  # --------------------------------------------------------------------------
+  # STEP 4: Enter correct PIN
+  # --------------------------------------------------------------------------
+  - id: enter-correct-pin
+    role: STAFF
+    description: "Staff enters their correct 4-digit PIN"
+    narration: "Sam enters his correct PIN: 1-2-3-4. The four dots fill in green one by one. After the last digit, he's authenticated and redirected to his dashboard."
+
+    actions:
+      # Enter correct PIN digits (Sam's PIN is 1234)
+      - type: click
+        selector: "button:has-text('1')"
+        waitAfter: 200
+      - type: click
+        selector: "button:has-text('2')"
+        waitAfter: 200
+      - type: click
+        selector: "button:has-text('3')"
+        waitAfter: 200
+      - type: click
+        selector: "button:has-text('4')"
+        waitAfter: 2000
+
+      # Wait for redirect to staff dashboard
+      - type: waitFor
+        text: "Log Behavior"
+        timeout: 5000
+
+    assertions:
+      # Verify we're on the staff dashboard
+      - type: visible
+        selector: "text=Log Behavior"
+
+    businessLogic:
+      # Staff can access behavior logging feature
+      - function: canAccessFeature
+        args:
+          role: SERVER
+          feature: behavior-logging
+        expected: true
+
+      # Staff can access PIN login feature
+      - function: canAccessFeature
+        args:
+          role: SERVER
+          feature: pin-login
+        expected: true
+
+# ============================================================================
+# METADATA
+# ============================================================================
+
+metadata:
+  timeout: 30000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 1920
+      height: 1080
+
+  reporter:
+    includeTimestamps: true
+    stepLabels: true
+
+  seedRequirements:
+    - type: user
+      role: SERVER
+      email: sam@achotel.com
+      pin: "1234"
+
+  documentation:
+    flow: docs/03-USER-FLOWS.md#12-staff-login-pin-based
+    api: docs/06-API-SPECIFICATION.md

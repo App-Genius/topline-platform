@@ -1,0 +1,246 @@
+# Staff Dashboard Flow
+# ====================
+# Staff views their comprehensive stats, history, and accesses AI coach
+#
+# This is a P0 flow that tests:
+# - Personal stats display (actions, streak, avg check)
+# - AI coach tip visibility
+# - AI coach full screen interaction
+# - Dashboard layout and elements
+
+flow:
+  id: staff-dashboard
+  name: "Staff Dashboard Flow"
+  description: "Staff views their stats, history, and accesses AI coaching"
+  narration: "This flow demonstrates the staff dashboard where team members track their personal performance and get AI-powered coaching tips."
+  priority: p0
+  tags:
+    - single-role
+    - staff
+    - dashboard
+    - ai-coach
+
+# ============================================================================
+# ROLES
+# ============================================================================
+
+roles:
+  - type: STAFF
+    fixture: staffPage
+    user: staffUser
+
+# ============================================================================
+# STEPS
+# ============================================================================
+
+steps:
+  # --------------------------------------------------------------------------
+  # STEP 1: Staff opens their dashboard
+  # --------------------------------------------------------------------------
+  - id: open-dashboard
+    role: STAFF
+    description: "Staff opens their personal dashboard"
+    narration: "Sam opens the Topline app on his phone. His personal dashboard shows all his key metrics at a glance."
+
+    actions:
+      - type: navigate
+        url: /staff
+
+      - type: waitFor
+        text: "Log Behavior"
+        timeout: 5000
+
+    assertions:
+      # User header is visible
+      - type: visible
+        selector: "text=Sam Server"
+        fallback:
+          - "[data-testid='user-header']"
+          - "text=Sam"
+
+      # Stats section visible
+      - type: visible
+        selector: "text=My Actions"
+        fallback:
+          - "text=MY ACTIONS"
+
+    businessLogic:
+      - function: isStaffRole
+        args:
+          role: SERVER
+        expected: true
+
+      - function: canAccessFeature
+        args:
+          role: SERVER
+          feature: behavior-logging
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 2: Staff reviews their stats
+  # --------------------------------------------------------------------------
+  - id: review-stats
+    role: STAFF
+    description: "Staff reviews their personal statistics"
+    narration: "Sam checks his three key metrics: actions logged, current streak, and average check. He's on a roll with his streak."
+
+    actions:
+      - type: waitFor
+        text: "My Actions"
+        timeout: 3000
+
+    assertions:
+      # All three stat cards visible
+      - type: visible
+        selector: "text=My Actions"
+
+      - type: visible
+        selector: "text=Streak"
+
+      - type: visible
+        selector: "text=Avg Check"
+        fallback:
+          - "text=AVG CHECK"
+
+    businessLogic:
+      # Verify role checks
+      - function: isManagerRole
+        args:
+          role: SERVER
+        expected: false
+
+      - function: isAdminRole
+        args:
+          role: SERVER
+        expected: false
+
+  # --------------------------------------------------------------------------
+  # STEP 3: Staff sees AI coach tip
+  # --------------------------------------------------------------------------
+  - id: see-ai-tip
+    role: STAFF
+    description: "Staff notices the AI coach tip banner"
+    narration: "At the top of Sam's screen, the AI Coach has a personalized tip for him. It suggests pushing a specific menu item based on today's goals."
+
+    actions:
+      - type: waitFor
+        text: "AI Coach Tip"
+        timeout: 3000
+
+    assertions:
+      - type: visible
+        selector: "text=AI Coach Tip"
+        fallback:
+          - "text=AI Coach"
+
+      - type: visible
+        selector: "text=Tap for more tips"
+        fallback:
+          - "text=more tips"
+
+  # --------------------------------------------------------------------------
+  # STEP 4: Staff opens AI coach
+  # --------------------------------------------------------------------------
+  - id: open-ai-coach
+    role: STAFF
+    description: "Staff taps to open full AI coach view"
+    narration: "Curious to learn more, Sam taps on the AI Coach banner. A full-screen coaching interface slides up with today's focus and training videos."
+
+    actions:
+      - type: click
+        selector: "text=Tap for more tips"
+        fallback:
+          - "[data-testid='ai-coach-banner']"
+          - "text=AI Coach Tip"
+        waitAfter: 500
+
+      - type: waitFor
+        text: "AI Coach"
+        timeout: 3000
+
+    assertions:
+      - type: visible
+        selector: "text=Focus for Today"
+        fallback:
+          - "text=Today"
+
+      - type: visible
+        selector: "text=Micro-Training"
+        fallback:
+          - "text=Training"
+
+      - type: visible
+        selector: "text=Close"
+
+  # --------------------------------------------------------------------------
+  # STEP 5: Staff closes AI coach
+  # --------------------------------------------------------------------------
+  - id: close-ai-coach
+    role: STAFF
+    description: "Staff closes AI coach and returns to dashboard"
+    narration: "After reviewing the coaching tips, Sam closes the AI Coach and returns to his main dashboard, ready to log some behaviors."
+
+    actions:
+      - type: click
+        selector: "text=Close"
+        waitAfter: 500
+
+      - type: waitFor
+        text: "Log Behavior"
+        timeout: 3000
+
+    assertions:
+      - type: visible
+        selector: "text=Log Behavior"
+
+      - type: visible
+        selector: "text=My Actions"
+
+    businessLogic:
+      # Staff can access all behavior logging features
+      - function: canAccessFeature
+        args:
+          role: SERVER
+          feature: behavior-logging
+        expected: true
+
+      # But not admin features
+      - function: canAccessFeature
+        args:
+          role: SERVER
+          feature: admin
+        expected: false
+
+      # Or settings
+      - function: canAccessFeature
+        args:
+          role: SERVER
+          feature: settings
+        expected: false
+
+# ============================================================================
+# METADATA
+# ============================================================================
+
+metadata:
+  timeout: 60000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 375
+      height: 812
+
+  reporter:
+    includeTimestamps: true
+    stepLabels: true
+
+  seedRequirements:
+    - type: user
+      role: SERVER
+      email: sam@achotel.com
+      pin: "1234"
+
+  documentation:
+    flow: docs/03-USER-FLOWS.md#15-staff-dashboard

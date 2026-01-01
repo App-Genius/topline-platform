@@ -55,8 +55,10 @@ export const FUNCTION_MAP = {
 
   canAccessAdmin: (args: { role: RoleType }) => core.canAccessAdmin(args.role),
 
-  canAccessFeature: (args: { role: RoleType; feature: 'briefings' | 'verification' | 'analytics' | 'settings' | 'users' | 'roles' }) =>
+  canAccessFeature: (args: { role: RoleType; feature: 'verification' | 'briefing' | 'briefings' | 'behavior-logging' | 'pin-login' | 'admin' | 'analytics' | 'settings' | 'users' | 'roles' }) =>
     core.canAccessFeature(args.role, args.feature),
+
+  canUsePinLogin: (args: { role: RoleType }) => core.canUsePinLogin(args.role),
 
   canViewAllUsers: (args: { role: RoleType }) => core.canViewAllUsers(args.role),
 
@@ -121,6 +123,13 @@ export const FUNCTION_MAP = {
 
   formatPercent: (args: { value: number; decimals?: number }) =>
     core.formatPercent(args.value, args.decimals),
+
+  // Streak Functions
+  calculateStreak: (args: { dates: string[]; today: string }) =>
+    core.calculateStreak(new Set(args.dates), args.today),
+
+  calculateLongestBehaviorStreak: (args: { dates: string[] }) =>
+    core.calculateLongestBehaviorStreak(new Set(args.dates)),
 } as const;
 
 export type FunctionName = keyof typeof FUNCTION_MAP;

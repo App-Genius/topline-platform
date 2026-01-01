@@ -46,6 +46,7 @@ model User {
   passwordHash   String
   name           String
   avatar         String?
+  pin            String?  // 4-digit PIN for staff quick login on shared devices
   organizationId String
   roleId         String
   isActive       Boolean  @default(true)
@@ -58,6 +59,9 @@ model User {
   behaviorLogs     BehaviorLog[]
   verifiedLogs     BehaviorLog[]     @relation("VerifiedBy")
   trainingAttendance TrainingAttendance[]
+
+  // Indexes
+  @@index([pin, organizationId]) // PIN login lookup within org
 }
 
 model Role {

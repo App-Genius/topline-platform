@@ -1,0 +1,197 @@
+# Behavior Streak Flow
+# ====================
+# Staff views their streak and logs behaviors to maintain/extend it
+#
+# This is a P0 flow that tests:
+# - Streak display on staff dashboard
+# - Streak calculation logic
+# - Motivation for consistent logging
+
+flow:
+  id: behavior-streak
+  name: "Behavior Streak Flow"
+  description: "Staff views their logging streak and maintains it by logging behaviors"
+  narration: "This flow shows how staff can track their consecutive day logging streak, motivating consistent behavior logging."
+  priority: p0
+  tags:
+    - single-role
+    - staff
+    - gamification
+    - streak
+
+# ============================================================================
+# ROLES
+# ============================================================================
+
+roles:
+  - type: STAFF
+    fixture: staffPage
+    user: staffUser
+
+# ============================================================================
+# STEPS
+# ============================================================================
+
+steps:
+  # --------------------------------------------------------------------------
+  # STEP 1: Staff opens dashboard to see streak
+  # --------------------------------------------------------------------------
+  - id: view-streak
+    role: STAFF
+    description: "Staff opens dashboard and sees their streak"
+    narration: "Sam opens his dashboard to check his logging streak. The streak counter shows how many consecutive days he has logged behaviors."
+
+    actions:
+      - type: navigate
+        url: /staff
+
+      - type: waitFor
+        text: "Streak"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "[data-testid='streak-count']"
+        fallback:
+          - "text=Streak"
+
+      - type: visible
+        selector: "text=Log Behavior"
+
+    businessLogic:
+      # Verify streak calculation - consecutive days
+      - function: calculateStreak
+        args:
+          dates:
+            - "2024-01-03"
+            - "2024-01-04"
+            - "2024-01-05"
+          today: "2024-01-05"
+        expected: 3
+
+      # No streak if no today's log
+      - function: calculateStreak
+        args:
+          dates:
+            - "2024-01-03"
+            - "2024-01-04"
+          today: "2024-01-05"
+        expected: 0
+
+      # Gap breaks streak
+      - function: calculateStreak
+        args:
+          dates:
+            - "2024-01-01"
+            - "2024-01-03"
+            - "2024-01-05"
+          today: "2024-01-05"
+        expected: 1
+
+  # --------------------------------------------------------------------------
+  # STEP 2: Staff logs a behavior to maintain streak
+  # --------------------------------------------------------------------------
+  - id: log-to-maintain-streak
+    role: STAFF
+    description: "Staff logs a behavior to maintain their streak"
+    narration: "To keep his streak going, Sam logs his first behavior of the day - recommending a wine pairing."
+
+    actions:
+      - type: click
+        selector: "button:has-text('Recommend wine pairing')"
+        fallback:
+          - "text=Recommend wine pairing"
+        waitAfter: 500
+
+      - type: waitFor
+        text: "Tap again to Confirm"
+        timeout: 3000
+
+      - type: click
+        selector: "text=Tap again to Confirm"
+        fallback:
+          - "button:has-text('Tap again')"
+        waitAfter: 1000
+
+      - type: waitFor
+        text: "LOGGED"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=LOGGED"
+
+  # --------------------------------------------------------------------------
+  # STEP 3: Verify streak is maintained
+  # --------------------------------------------------------------------------
+  - id: verify-streak-maintained
+    role: STAFF
+    description: "Staff verifies their streak is still active"
+    narration: "After logging, Sam sees his streak is maintained. The flame icon glows, showing he's on a roll."
+
+    actions:
+      - type: waitFor
+        text: "Log Behavior"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "[data-testid='streak-count']"
+
+      - type: visible
+        selector: "text=My Actions"
+
+    businessLogic:
+      # Longest streak calculation
+      - function: calculateLongestBehaviorStreak
+        args:
+          dates:
+            - "2024-01-01"
+            - "2024-01-02"
+            - "2024-01-03"
+            - "2024-01-05"
+            - "2024-01-06"
+        expected: 3
+
+      # Empty dates = no streak
+      - function: calculateLongestBehaviorStreak
+        args:
+          dates: []
+        expected: 0
+
+      # Single day = streak of 1
+      - function: calculateStreak
+        args:
+          dates:
+            - "2024-01-05"
+          today: "2024-01-05"
+        expected: 1
+
+# ============================================================================
+# METADATA
+# ============================================================================
+
+metadata:
+  timeout: 60000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 375
+      height: 812
+
+  reporter:
+    includeTimestamps: true
+    stepLabels: true
+
+  seedRequirements:
+    - type: user
+      role: SERVER
+      email: sam@achotel.com
+      pin: "1234"
+    - type: behavior
+      name: Recommend wine pairing
+
+  documentation:
+    flow: docs/03-USER-FLOWS.md#14-behavior-streak

@@ -106,20 +106,20 @@ async function main() {
   }
   console.log(`✅ Created ${roleData.length} roles`)
 
-  // Create users
+  // Create users with PINs for staff quick login
   const passwordHash = await hash('achotel123', 12)
   const userData = [
-    { email: 'joel@achotel.com', name: 'Joel Dean', avatar: 'JD', roleType: RoleType.ADMIN },
-    { email: 'sarah@achotel.com', name: 'Sarah Manager', avatar: 'SM', roleType: RoleType.MANAGER },
-    { email: 'mike@achotel.com', name: 'Mike Lobby', avatar: 'ML', roleType: RoleType.FRONT_DESK },
-    { email: 'emma@achotel.com', name: 'Emma Desk', avatar: 'ED', roleType: RoleType.FRONT_DESK },
-    { email: 'sam@achotel.com', name: 'Sam Server', avatar: 'SS', roleType: RoleType.SERVER },  // E2E test user
-    { email: 'lisa@achotel.com', name: 'Lisa Server', avatar: 'LS', roleType: RoleType.SERVER },
-    { email: 'tom@achotel.com', name: 'Tom Bartender', avatar: 'TB', roleType: RoleType.BARTENDER },
-    { email: 'ana@achotel.com', name: 'Ana Rooms', avatar: 'AR', roleType: RoleType.HOUSEKEEPING },
-    { email: 'maria@achotel.com', name: 'Maria Clean', avatar: 'MC', roleType: RoleType.HOUSEKEEPING },
-    { email: 'carlos@achotel.com', name: 'Carlos Chef', avatar: 'CC', roleType: RoleType.CHEF },
-    { email: 'david@achotel.com', name: 'David Buyer', avatar: 'DB', roleType: RoleType.PURCHASER },
+    { email: 'joel@achotel.com', name: 'Joel Dean', avatar: 'JD', roleType: RoleType.ADMIN, pin: null },
+    { email: 'sarah@achotel.com', name: 'Sarah Manager', avatar: 'SM', roleType: RoleType.MANAGER, pin: '0000' },
+    { email: 'mike@achotel.com', name: 'Mike Lobby', avatar: 'ML', roleType: RoleType.FRONT_DESK, pin: '1111' },
+    { email: 'emma@achotel.com', name: 'Emma Desk', avatar: 'ED', roleType: RoleType.FRONT_DESK, pin: '2222' },
+    { email: 'sam@achotel.com', name: 'Sam Server', avatar: 'SS', roleType: RoleType.SERVER, pin: '1234' },  // E2E test user
+    { email: 'lisa@achotel.com', name: 'Lisa Server', avatar: 'LS', roleType: RoleType.SERVER, pin: '3333' },
+    { email: 'tom@achotel.com', name: 'Tom Bartender', avatar: 'TB', roleType: RoleType.BARTENDER, pin: '4444' },
+    { email: 'ana@achotel.com', name: 'Ana Rooms', avatar: 'AR', roleType: RoleType.HOUSEKEEPING, pin: '5555' },
+    { email: 'maria@achotel.com', name: 'Maria Clean', avatar: 'MC', roleType: RoleType.HOUSEKEEPING, pin: '6666' },
+    { email: 'carlos@achotel.com', name: 'Carlos Chef', avatar: 'CC', roleType: RoleType.CHEF, pin: '7777' },
+    { email: 'david@achotel.com', name: 'David Buyer', avatar: 'DB', roleType: RoleType.PURCHASER, pin: '8888' },
   ]
 
   const users: Record<string, Awaited<ReturnType<typeof prisma.user.create>>> = {}
@@ -130,13 +130,14 @@ async function main() {
         passwordHash,
         name: user.name,
         avatar: user.avatar,
+        pin: user.pin,
         organizationId: org.id,
         roleId: roles[user.roleType].id,
       },
     })
     users[user.email] = created
   }
-  console.log(`✅ Created ${userData.length} users`)
+  console.log(`✅ Created ${userData.length} users (with PINs)`)
 
   // Create location
   const location = await prisma.location.create({

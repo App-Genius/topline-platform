@@ -1,0 +1,80 @@
+# Feedback Submission Flow
+# ========================
+# Staff can provide feedback
+#
+# This flow tests staff page feedback/help options.
+
+flow:
+  id: feedback-submission
+  name: "Feedback Submission Flow"
+  description: "Staff views feedback options"
+  narration: "This flow demonstrates the staff interface for providing feedback."
+  priority: p1
+  tags:
+    - single-role
+    - staff
+    - feedback
+
+roles:
+  - type: STAFF
+    fixture: staffPage
+    user: staffUser
+
+steps:
+  - id: open-staff-page
+    role: STAFF
+    description: "Staff opens their dashboard"
+    narration: "Mike opens the staff dashboard."
+
+    actions:
+      - type: navigate
+        url: /staff
+
+      - type: waitFor
+        text: "Log Behavior"
+        timeout: 10000
+
+    assertions:
+      - type: visible
+        selector: "text=Log Behavior"
+
+    businessLogic:
+      - function: isStaffRole
+        args:
+          role: SERVER
+        expected: true
+
+  - id: view-stats
+    role: STAFF
+    description: "Staff views their stats"
+    narration: "Mike sees their personal stats."
+
+    actions:
+      - type: waitFor
+        text: "Recommend wine pairing"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "button:has-text('Recommend wine pairing')"
+
+    businessLogic:
+      - function: canAccessAdmin
+        args:
+          role: SERVER
+        expected: false
+
+metadata:
+  timeout: 60000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 1280
+      height: 720
+
+  seedRequirements:
+    - type: user
+      role: STAFF
+      email: mike@achotel.com

@@ -1,0 +1,91 @@
+# Permission Denied Flow
+# =====================
+# Staff cannot access admin pages
+#
+# This flow tests RBAC by checking staff limitations.
+
+flow:
+  id: permission-denied
+  name: "Permission Denied Flow"
+  description: "Staff cannot access manager or admin areas"
+  narration: "This flow verifies that staff roles are properly restricted."
+  priority: p1
+  tags:
+    - single-role
+    - staff
+    - rbac
+    - security
+
+roles:
+  - type: STAFF
+    fixture: staffPage
+    user: staffUser
+
+steps:
+  - id: open-staff-page
+    role: STAFF
+    description: "Staff opens their dashboard"
+    narration: "Mike opens the staff page which is within their permissions."
+
+    actions:
+      - type: navigate
+        url: /staff
+
+      - type: waitFor
+        text: "Log Behavior"
+        timeout: 10000
+
+    assertions:
+      - type: visible
+        selector: "text=Log Behavior"
+
+    businessLogic:
+      - function: isStaffRole
+        args:
+          role: SERVER
+        expected: true
+
+      - function: canAccessAdmin
+        args:
+          role: SERVER
+        expected: false
+
+  - id: verify-staff-limits
+    role: STAFF
+    description: "Staff page shows limited options"
+    narration: "Mike's interface is limited to staff-appropriate actions."
+
+    actions:
+      - type: waitFor
+        text: "Recommend wine pairing"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "button:has-text('Recommend wine pairing')"
+
+    businessLogic:
+      - function: canVerifyLogs
+        args:
+          role: SERVER
+        expected: false
+
+      - function: isManagerRole
+        args:
+          role: SERVER
+        expected: false
+
+metadata:
+  timeout: 60000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 1280
+      height: 720
+
+  seedRequirements:
+    - type: user
+      role: STAFF
+      email: mike@achotel.com

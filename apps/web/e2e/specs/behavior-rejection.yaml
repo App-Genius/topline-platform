@@ -1,0 +1,193 @@
+# Behavior Rejection Flow
+# ========================
+# Multi-role flow: Staff logs behavior, Manager rejects with reason
+#
+# This is a P0 flow that tests:
+# - Staff logs a behavior
+# - Manager sees it in pending queue
+# - Manager rejects the behavior
+# - Staff no longer sees it as verified
+
+flow:
+  id: behavior-rejection
+  name: "Behavior Rejection Flow"
+  description: "Staff logs behavior that manager rejects"
+  narration: "This flow demonstrates the rejection workflow when a manager determines a logged behavior is invalid or fraudulent."
+  priority: p0
+  tags:
+    - multi-role
+    - staff
+    - manager
+    - verification
+
+# ============================================================================
+# ROLES
+# ============================================================================
+
+roles:
+  - type: STAFF
+    fixture: staffPage
+    user: staffUser
+
+  - type: MANAGER
+    fixture: managerPage
+    user: managerUser
+
+# ============================================================================
+# STEPS
+# ============================================================================
+
+steps:
+  # --------------------------------------------------------------------------
+  # STEP 1: Staff logs a behavior
+  # --------------------------------------------------------------------------
+  - id: staff-logs-behavior
+    role: STAFF
+    description: "Staff logs a behavior that will be rejected"
+    narration: "Sam logs a wine upsell behavior. Little does he know, the manager watched him and knows he didn't actually recommend wine."
+
+    actions:
+      - type: navigate
+        url: /staff
+
+      - type: waitFor
+        text: "Log Behavior"
+        timeout: 5000
+
+      - type: click
+        selector: "button:has-text('Recommend wine pairing')"
+        fallback:
+          - "text=Recommend wine pairing"
+        waitAfter: 500
+
+      - type: waitFor
+        text: "Tap again to Confirm"
+        timeout: 3000
+
+      - type: click
+        selector: "text=Tap again to Confirm"
+        waitAfter: 1000
+
+      - type: waitFor
+        text: "LOGGED"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=LOGGED"
+
+    businessLogic:
+      - function: isStaffRole
+        args:
+          role: SERVER
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 2: Manager navigates to verification queue
+  # --------------------------------------------------------------------------
+  - id: manager-goes-to-queue
+    role: MANAGER
+    description: "Manager opens the verification queue"
+    narration: "Sarah, the manager, opens her verification queue. She sees Sam's behavior log waiting for review."
+
+    actions:
+      - type: navigate
+        url: /manager/verification
+
+      - type: waitFor
+        text: "Behavior Verification"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=Behavior Verification"
+
+      - type: visible
+        selector: "text=pending"
+        fallback:
+          - "text=Pending"
+
+    businessLogic:
+      - function: canVerifyLogs
+        args:
+          role: MANAGER
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 3: Manager rejects the behavior
+  # --------------------------------------------------------------------------
+  - id: manager-rejects
+    role: MANAGER
+    description: "Manager rejects the behavior"
+    narration: "Sarah rejects Sam's behavior log. The system records the rejection and removes it from the pending queue."
+
+    actions:
+      # Select all pending behaviors
+      - type: click
+        selector: "button:has-text('Select All')"
+        fallback:
+          - "[data-testid='select-all']"
+        waitAfter: 500
+
+      # Click Reject Selected
+      - type: click
+        selector: "button:has-text('Reject Selected')"
+        fallback:
+          - "[data-testid='reject-selected']"
+          - "text=Reject"
+        waitAfter: 1000
+
+      # Wait for confirmation
+      - type: waitFor
+        text: "rejected"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=rejected"
+        fallback:
+          - "text=All caught up"
+          - "text=0 pending"
+
+    businessLogic:
+      # Staff cannot delete verified logs
+      - function: canStaffDeleteLog
+        args:
+          isStaff: true
+          isLogOwner: true
+          isVerified: true
+        expected:
+          canDelete: false
+          reason: "Cannot delete verified logs"
+
+# ============================================================================
+# METADATA
+# ============================================================================
+
+metadata:
+  timeout: 90000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 1280
+      height: 720
+
+  reporter:
+    includeTimestamps: true
+    stepLabels: true
+
+  seedRequirements:
+    - type: user
+      role: SERVER
+      email: sam@achotel.com
+      pin: "1234"
+    - type: user
+      role: MANAGER
+      email: sarah@achotel.com
+    - type: behavior
+      name: Recommend wine pairing
+
+  documentation:
+    flow: docs/03-USER-FLOWS.md#22-behavior-rejection

@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useBehaviors, useBehaviorLogs, useLogBehavior } from '@/hooks/queries';
-import { ScanLine, Check, MessageSquarePlus, TrendingUp, Zap, Sparkles, X, ArrowRight, CheckCircle, Plus, Loader2 } from 'lucide-react';
+import { ScanLine, Check, MessageSquarePlus, TrendingUp, Zap, Sparkles, X, ArrowRight, CheckCircle, Plus, Loader2, Flame } from 'lucide-react';
+import { calculateStreak } from '@/lib/core';
 import { clsx } from 'clsx';
 
 export default function StaffPage() {
@@ -37,6 +38,14 @@ export default function StaffPage() {
   // Count verified vs pending
   const verifiedCount = todaysLogs.filter(l => l.verified).length;
   const pendingCount = todaysLogs.filter(l => !l.verified).length;
+
+  // Calculate streak from all logs (consecutive days with at least one log)
+  const allLogDates = new Set(
+    (myLogs?.data ?? [])
+      .filter(log => log.createdAt)
+      .map(log => new Date(log.createdAt!).toISOString().split('T')[0])
+  );
+  const currentStreak = calculateStreak(allLogDates, today);
 
   const handleStartLog = (bId: string) => {
     setSelectedBehavior(bId);
@@ -125,14 +134,14 @@ export default function StaffPage() {
             </div>
 
             {/* Personal Stats */}
-            <div className="grid grid-cols-2 gap-4 mb-8">
-              <div className="bg-slate-800 rounded-2xl p-5 border border-slate-700">
+            <div className="grid grid-cols-3 gap-3 mb-8">
+              <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
                 <div className="text-slate-400 text-xs font-bold uppercase mb-2">My Actions</div>
-                <div className="text-4xl font-black text-white">{myTotalBehaviors}</div>
-                <div className="text-xs mt-1 flex items-center gap-2">
+                <div className="text-3xl font-black text-white">{myTotalBehaviors}</div>
+                <div className="text-xs mt-1 flex items-center gap-2 flex-wrap">
                   {verifiedCount > 0 && (
                     <span className="text-emerald-400 flex items-center gap-1">
-                      <CheckCircle size={12} /> {verifiedCount} verified
+                      <CheckCircle size={12} /> {verifiedCount}
                     </span>
                   )}
                   {pendingCount > 0 && (
@@ -140,9 +149,19 @@ export default function StaffPage() {
                   )}
                 </div>
               </div>
-              <div className="bg-slate-800 rounded-2xl p-5 border border-slate-700">
+              <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+                <div className="text-slate-400 text-xs font-bold uppercase mb-2">Streak</div>
+                <div className="text-3xl font-black text-orange-400 flex items-center gap-1" data-testid="streak-count">
+                  {currentStreak}
+                  <Flame size={24} className="text-orange-400" />
+                </div>
+                <div className="text-slate-500 text-xs mt-1">
+                  {currentStreak === 0 ? 'Log today!' : currentStreak === 1 ? '1 day' : `${currentStreak} days`}
+                </div>
+              </div>
+              <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
                 <div className="text-slate-400 text-xs font-bold uppercase mb-2">Avg Check</div>
-                <div className="text-4xl font-black text-emerald-400">$62</div>
+                <div className="text-3xl font-black text-emerald-400">$62</div>
                 <div className="text-slate-500 text-xs mt-1">Target: $55</div>
               </div>
             </div>

@@ -1,0 +1,199 @@
+# KPI Configuration Flow
+# =======================
+# Admin configures lag and lead measures (KPIs)
+#
+# This is a P1 flow that tests:
+# - Admin access to settings area
+# - KPI configuration page
+# - Viewing existing measures
+# - RBAC business logic verification
+#
+# NOTE: This flow focuses on navigation and viewing KPI settings.
+
+flow:
+  id: kpi-configuration
+  name: "KPI Configuration Flow"
+  description: "Admin configures lag and lead measures"
+  narration: "This flow demonstrates how an admin accesses and views the KPI configuration settings."
+  priority: p1
+  tags:
+    - single-role
+    - admin
+    - settings
+    - kpi
+
+# ============================================================================
+# ROLES
+# ============================================================================
+
+roles:
+  - type: ADMIN
+    fixture: adminPage
+    user: adminUser
+
+# ============================================================================
+# STEPS
+# ============================================================================
+
+steps:
+  # --------------------------------------------------------------------------
+  # STEP 1: Admin opens admin dashboard
+  # --------------------------------------------------------------------------
+  - id: open-admin-dashboard
+    role: ADMIN
+    description: "Admin opens the admin dashboard"
+    narration: "Joel opens the admin console to access configuration settings."
+
+    actions:
+      - type: navigate
+        url: /admin
+
+      - type: waitFor
+        text: "Admin Console"
+        timeout: 15000
+
+    assertions:
+      - type: visible
+        selector: "text=Admin Console"
+
+      - type: visible
+        selector: "a[href='/admin/settings']"
+        fallback:
+          - "text=Settings"
+
+    businessLogic:
+      - function: isAdminRole
+        args:
+          role: ADMIN
+        expected: true
+
+      - function: canAccessAdmin
+        args:
+          role: ADMIN
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 2: Admin navigates to settings
+  # --------------------------------------------------------------------------
+  - id: navigate-to-settings
+    role: ADMIN
+    description: "Admin clicks on Settings in the sidebar"
+    narration: "Joel clicks on Settings to access configuration options."
+
+    actions:
+      - type: click
+        selector: "a[href='/admin/settings']"
+        fallback:
+          - "text=Settings"
+        waitAfter: 2000
+
+      - type: waitFor
+        text: "Scoreboard Metrics"
+        timeout: 10000
+
+    assertions:
+      - type: visible
+        selector: "text=Scoreboard Metrics"
+
+    businessLogic:
+      - function: canAccessAdmin
+        args:
+          role: ADMIN
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 3: Admin views KPI settings section
+  # --------------------------------------------------------------------------
+  - id: view-kpi-settings
+    role: ADMIN
+    description: "Admin views the KPI configuration options"
+    narration: "Joel sees the available configuration options for lag and lead measures."
+
+    actions:
+      - type: waitFor
+        text: "Display Options"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=Display Options"
+
+      - type: visible
+        selector: "text=Show Leaderboard"
+
+    businessLogic:
+      # Calculate variance for KPI targets
+      - function: calculateVariance
+        args:
+          actual: 85000
+          target: 80000
+        expected: 6.25
+
+      - function: calculateProgress
+        args:
+          current: 60000
+          target: 80000
+        expected: 75
+
+  # --------------------------------------------------------------------------
+  # STEP 4: Admin verifies role restrictions
+  # --------------------------------------------------------------------------
+  - id: verify-role-restrictions
+    role: ADMIN
+    description: "Admin confirms only admins can access settings"
+    narration: "Joel confirms that staff and managers cannot access these configuration settings."
+
+    actions:
+      - type: waitFor
+        text: "Scoreboard Metrics"
+        timeout: 3000
+
+    assertions:
+      - type: visible
+        selector: "a[href='/admin']"
+
+      - type: visible
+        selector: "text=Save Changes"
+
+    businessLogic:
+      # Non-admin roles cannot access admin settings
+      - function: canAccessAdmin
+        args:
+          role: SERVER
+        expected: false
+
+      - function: canAccessAdmin
+        args:
+          role: MANAGER
+        expected: false
+
+      - function: isManagerRole
+        args:
+          role: ADMIN
+        expected: false
+
+# ============================================================================
+# METADATA
+# ============================================================================
+
+metadata:
+  timeout: 60000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 1280
+      height: 720
+
+  reporter:
+    includeTimestamps: true
+    stepLabels: true
+
+  seedRequirements:
+    - type: user
+      role: ADMIN
+      email: joel@achotel.com
+
+  documentation:
+    flow: docs/03-USER-FLOWS.md#kpi-configuration

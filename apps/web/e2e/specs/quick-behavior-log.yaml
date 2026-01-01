@@ -1,0 +1,280 @@
+# Quick Behavior Log Flow
+# =======================
+# Fast mobile-first behavior logging on the go
+#
+# This is a P0 flow that tests:
+# - Mobile viewport behavior logging
+# - Rapid succession logging (multiple behaviors quickly)
+# - Success feedback and animation
+# - Auto-reset after timeout
+
+flow:
+  id: quick-behavior-log
+  name: "Quick Behavior Log Flow"
+  description: "Staff quickly logs multiple behaviors in succession on mobile"
+  narration: "This flow demonstrates the optimized mobile experience for logging behaviors during a busy shift."
+  priority: p0
+  tags:
+    - single-role
+    - staff
+    - mobile
+    - behavior-logging
+
+# ============================================================================
+# ROLES
+# ============================================================================
+
+roles:
+  - type: STAFF
+    fixture: staffPage
+    user: staffUser
+
+# ============================================================================
+# STEPS
+# ============================================================================
+
+steps:
+  # --------------------------------------------------------------------------
+  # STEP 1: Staff accesses dashboard on mobile
+  # --------------------------------------------------------------------------
+  - id: access-mobile-dashboard
+    role: STAFF
+    description: "Staff opens dashboard on mobile viewport"
+    narration: "During a busy dinner rush, Sam pulls out his phone to quickly log a behavior. The mobile interface is optimized for speed."
+
+    actions:
+      - type: navigate
+        url: /staff
+
+      - type: waitFor
+        text: "Log Behavior"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=My Actions"
+        fallback:
+          - "text=MY ACTIONS"
+
+      - type: visible
+        selector: "text=Avg Check"
+        fallback:
+          - "text=AVG CHECK"
+
+    businessLogic:
+      - function: canAccessFeature
+        args:
+          role: SERVER
+          feature: behavior-logging
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 2: First behavior - Recommend wine pairing (two-tap pattern)
+  # --------------------------------------------------------------------------
+  - id: log-first-behavior
+    role: STAFF
+    description: "Staff logs wine recommendation with two-tap confirmation"
+    narration: "Sam just recommended the house Pinot Noir. He taps Recommend wine pairing, sees the confirm prompt, and taps again. Boom - logged."
+
+    actions:
+      # First tap - selects behavior
+      - type: click
+        selector: "button:has-text('Recommend wine pairing')"
+        fallback:
+          - "text=Recommend wine pairing"
+          - "button:has-text('wine pairing')"
+        waitAfter: 500
+
+      # Wait for confirmation state
+      - type: waitFor
+        text: "Tap again to Confirm"
+        timeout: 3000
+
+      # Second tap - confirms
+      - type: click
+        selector: "text=Tap again to Confirm"
+        fallback:
+          - "button:has-text('Tap again')"
+        waitAfter: 1000
+
+      # Wait for success animation
+      - type: waitFor
+        text: "LOGGED"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=LOGGED"
+        fallback:
+          - "text=Logged"
+          - "[data-testid='success-toast']"
+
+    businessLogic:
+      - function: isStaffRole
+        args:
+          role: SERVER
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 3: Rapid second behavior - Offer dessert
+  # --------------------------------------------------------------------------
+  - id: log-second-behavior
+    role: STAFF
+    description: "Staff quickly logs another behavior"
+    narration: "Right after, Sam offers the chocolate lava cake. Without missing a beat, he logs that too."
+
+    actions:
+      # Wait for success animation to clear
+      - type: waitFor
+        text: "Log Behavior"
+        timeout: 5000
+
+      # First tap
+      - type: click
+        selector: "button:has-text('Offer dessert')"
+        fallback:
+          - "text=Offer dessert"
+          - "button:has-text('dessert')"
+        waitAfter: 500
+
+      # Wait for confirmation
+      - type: waitFor
+        text: "Tap again to Confirm"
+        timeout: 3000
+
+      # Confirm
+      - type: click
+        selector: "text=Tap again to Confirm"
+        fallback:
+          - "button:has-text('Tap again')"
+        waitAfter: 1000
+
+      # Wait for success
+      - type: waitFor
+        text: "LOGGED"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=LOGGED"
+
+  # --------------------------------------------------------------------------
+  # STEP 4: Third behavior - Suggest appetizer
+  # --------------------------------------------------------------------------
+  - id: log-third-behavior
+    role: STAFF
+    description: "Staff logs a third behavior in quick succession"
+    narration: "While at the table, Sam also suggested an appetizer. He's on a roll - three behaviors logged in under a minute."
+
+    actions:
+      # Wait for previous success to clear
+      - type: waitFor
+        text: "Log Behavior"
+        timeout: 5000
+
+      # First tap
+      - type: click
+        selector: "button:has-text('Suggest appetizer')"
+        fallback:
+          - "text=Suggest appetizer"
+          - "button:has-text('appetizer')"
+        waitAfter: 500
+
+      # Wait for confirmation
+      - type: waitFor
+        text: "Tap again to Confirm"
+        timeout: 3000
+
+      # Confirm
+      - type: click
+        selector: "text=Tap again to Confirm"
+        fallback:
+          - "button:has-text('Tap again')"
+        waitAfter: 1000
+
+      # Wait for success
+      - type: waitFor
+        text: "LOGGED"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=LOGGED"
+
+  # --------------------------------------------------------------------------
+  # STEP 5: Verify action count updated
+  # --------------------------------------------------------------------------
+  - id: verify-action-count
+    role: STAFF
+    description: "Staff verifies their action count has increased"
+    narration: "Sam checks his stats. His My Actions count has gone up by 3. The quick logging worked perfectly."
+
+    actions:
+      - type: waitFor
+        text: "My Actions"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=My Actions"
+        fallback:
+          - "text=MY ACTIONS"
+
+      - type: visible
+        selector: "text=pending"
+        fallback:
+          - "text=Pending"
+          - "text=verified"
+
+    businessLogic:
+      # Verify staff can delete unverified logs
+      - function: canStaffDeleteLog
+        args:
+          isStaff: true
+          isLogOwner: true
+          isVerified: false
+        expected:
+          canDelete: true
+
+      # But not verified ones
+      - function: canStaffDeleteLog
+        args:
+          isStaff: true
+          isLogOwner: true
+          isVerified: true
+        expected:
+          canDelete: false
+          reason: "Cannot delete verified logs"
+
+# ============================================================================
+# METADATA
+# ============================================================================
+
+metadata:
+  timeout: 60000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 375
+      height: 812
+
+  reporter:
+    includeTimestamps: true
+    stepLabels: true
+
+  seedRequirements:
+    - type: user
+      role: SERVER
+      email: sam@achotel.com
+      pin: "1234"
+    - type: behavior
+      name: Recommend wine pairing
+    - type: behavior
+      name: Offer dessert
+    - type: behavior
+      name: Suggest appetizer
+
+  documentation:
+    flow: docs/03-USER-FLOWS.md#13-quick-behavior-log

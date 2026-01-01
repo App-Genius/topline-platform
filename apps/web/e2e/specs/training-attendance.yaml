@@ -1,0 +1,85 @@
+# Training Attendance Flow
+# ========================
+# Multi-role: Staff marks attendance, Manager verifies
+#
+# This is a P1 flow that tests:
+# - Manager daily briefing with training
+# - Manager verification capabilities
+#
+# NOTE: This flow tests the manager briefing training section.
+
+flow:
+  id: training-attendance
+  name: "Training Attendance Flow"
+  description: "Manager views training topics in daily briefing"
+  narration: "This flow demonstrates how a manager views training topics in the daily briefing."
+  priority: p1
+  tags:
+    - single-role
+    - manager
+    - training
+    - briefing
+
+roles:
+  - type: MANAGER
+    fixture: managerPage
+    user: managerUser
+
+steps:
+  - id: open-manager-briefing
+    role: MANAGER
+    description: "Manager opens the daily briefing"
+    narration: "Sarah opens the daily briefing to see training topics."
+
+    actions:
+      - type: navigate
+        url: /manager/briefing
+
+      - type: waitFor
+        text: "Daily Briefing"
+        timeout: 10000
+
+    assertions:
+      - type: visible
+        selector: "text=Daily Briefing"
+
+    businessLogic:
+      - function: isManagerRole
+        args:
+          role: MANAGER
+        expected: true
+
+  - id: view-briefing-content
+    role: MANAGER
+    description: "Manager views the briefing content"
+    narration: "Sarah reviews the briefing sections."
+
+    actions:
+      - type: waitFor
+        text: "Briefing"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=Briefing"
+
+    businessLogic:
+      - function: canVerifyLogs
+        args:
+          role: MANAGER
+        expected: true
+
+metadata:
+  timeout: 60000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 1280
+      height: 720
+
+  seedRequirements:
+    - type: user
+      role: MANAGER
+      email: sarah@achotel.com

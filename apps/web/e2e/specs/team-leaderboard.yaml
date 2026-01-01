@@ -1,0 +1,227 @@
+# Team Leaderboard Flow
+# ======================
+# Manager/Staff views the team scoreboard and rankings
+#
+# This is a P0 flow that tests:
+# - Scoreboard page access
+# - Today's revenue display
+# - Team behaviors count
+# - Current leader highlight
+# - Leaderboard rankings table
+
+flow:
+  id: team-leaderboard
+  name: "Team Leaderboard Flow"
+  description: "Manager views the team scoreboard with rankings and performance metrics"
+  narration: "This flow demonstrates the TV-mode scoreboard designed for display in the restaurant, showing team rankings and daily performance."
+  priority: p0
+  tags:
+    - single-role
+    - manager
+    - scoreboard
+    - gamification
+
+# ============================================================================
+# ROLES
+# ============================================================================
+
+roles:
+  - type: MANAGER
+    fixture: managerPage
+    user: managerUser
+
+# ============================================================================
+# STEPS
+# ============================================================================
+
+steps:
+  # --------------------------------------------------------------------------
+  # STEP 1: Manager opens the scoreboard
+  # --------------------------------------------------------------------------
+  - id: open-scoreboard
+    role: MANAGER
+    description: "Manager opens the team scoreboard"
+    narration: "Sarah opens the scoreboard on the TV display. The dark theme is designed for easy viewing from across the restaurant."
+
+    actions:
+      - type: navigate
+        url: /scoreboard
+
+      - type: waitFor
+        text: "Today's Revenue"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=Today's Revenue"
+        fallback:
+          - "text=Revenue"
+
+      - type: visible
+        selector: "text=Team Behaviors"
+        fallback:
+          - "text=Behaviors"
+
+    businessLogic:
+      - function: isManagerRole
+        args:
+          role: MANAGER
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 2: Manager views today's metrics
+  # --------------------------------------------------------------------------
+  - id: view-daily-metrics
+    role: MANAGER
+    description: "Manager reviews today's revenue and behaviors"
+    narration: "Sarah checks the daily revenue card and sees how the team is performing against their target. The green color indicates they're winning."
+
+    actions:
+      - type: waitFor
+        text: "Today's Actions"
+        timeout: 3000
+
+    assertions:
+      - type: visible
+        selector: "text=Today's Actions"
+        fallback:
+          - "text=Actions"
+
+      - type: visible
+        selector: "text=/day"
+        fallback:
+          - "text=Avg"
+
+    businessLogic:
+      # Game state calculation tests
+      - function: determineGameState
+        args:
+          actual: 15000
+          target: 12000
+        expected: "winning"
+
+      - function: determineGameState
+        args:
+          actual: 8000
+          target: 12000
+        expected: "losing"
+
+      - function: calculateProgressPercent
+        args:
+          current: 9000
+          target: 12000
+        expected: 75
+
+  # --------------------------------------------------------------------------
+  # STEP 3: Manager views current leader
+  # --------------------------------------------------------------------------
+  - id: view-current-leader
+    role: MANAGER
+    description: "Manager sees who's currently leading"
+    narration: "The highlighted card shows who's currently in the lead. Sam is on top with strong behavior logging today."
+
+    actions:
+      - type: waitFor
+        text: "Current Leader"
+        timeout: 3000
+
+    assertions:
+      - type: visible
+        selector: "text=Current Leader"
+        fallback:
+          - "text=Leader"
+          - "text=No behaviors logged"
+
+    businessLogic:
+      # Medal type calculation
+      - function: getMedalType
+        args:
+          rank: 1
+        expected: "gold"
+
+      - function: getMedalType
+        args:
+          rank: 2
+        expected: "silver"
+
+      - function: getMedalType
+        args:
+          rank: 3
+        expected: "bronze"
+
+      - function: getMedalType
+        args:
+          rank: 4
+        expected: null
+
+  # --------------------------------------------------------------------------
+  # STEP 4: Manager views full leaderboard
+  # --------------------------------------------------------------------------
+  - id: view-leaderboard-table
+    role: MANAGER
+    description: "Manager views the full team leaderboard"
+    narration: "The main scoreboard table shows all team members ranked by their behavior points. Gold, silver, and bronze badges highlight the top three."
+
+    actions:
+      - type: waitFor
+        text: "Rank"
+        timeout: 3000
+
+    assertions:
+      - type: visible
+        selector: "text=Rank"
+
+      - type: visible
+        selector: "text=Team Member"
+        fallback:
+          - "text=Member"
+
+      - type: visible
+        selector: "text=Points"
+        fallback:
+          - "text=Score"
+
+    businessLogic:
+      # Rank calculation
+      - function: calculateRank
+        args:
+          scores:
+            - 100
+            - 80
+            - 60
+            - 40
+          score: 80
+        expected: 2
+
+      # Average check calculation
+      - function: calculateAverageCheck
+        args:
+          revenue: 5000
+          covers: 100
+        expected: 50
+
+# ============================================================================
+# METADATA
+# ============================================================================
+
+metadata:
+  timeout: 60000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 1920
+      height: 1080
+
+  reporter:
+    includeTimestamps: true
+    stepLabels: true
+
+  seedRequirements:
+    - type: user
+      role: MANAGER
+      email: sarah@achotel.com
+
+  documentation:
+    flow: docs/03-USER-FLOWS.md#16-team-leaderboard

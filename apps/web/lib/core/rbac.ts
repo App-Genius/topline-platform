@@ -239,6 +239,73 @@ export function canAccessManager(role: RoleType): boolean {
   return isManagerRole(role);
 }
 
+/**
+ * Check if role can use PIN login
+ *
+ * PIN login is designed for shared devices where staff members
+ * can quickly authenticate without entering email/password.
+ * All roles with PINs can use PIN login, but it's primarily
+ * designed for staff roles.
+ *
+ * @param role - User's role
+ * @returns True if can use PIN login
+ *
+ * @example
+ * canUsePinLogin('SERVER')  // => true
+ * canUsePinLogin('MANAGER') // => true
+ * canUsePinLogin('ADMIN')   // => false (typically no PIN)
+ */
+export function canUsePinLogin(role: RoleType): boolean {
+  // All non-admin roles can use PIN login if they have a PIN configured
+  return role !== 'ADMIN';
+}
+
+/**
+ * Check if role can access a specific feature
+ *
+ * @param role - User's role
+ * @param feature - Feature to check access for
+ * @returns True if can access the feature
+ */
+export function canAccessFeature(
+  role: RoleType,
+  feature:
+    | 'verification'
+    | 'briefing'
+    | 'briefings'
+    | 'behavior-logging'
+    | 'pin-login'
+    | 'admin'
+    | 'analytics'
+    | 'settings'
+    | 'users'
+    | 'roles'
+): boolean {
+  switch (feature) {
+    case 'verification':
+      return isManagerRole(role);
+    case 'briefing':
+    case 'briefings':
+      return true; // All roles can see briefings
+    case 'behavior-logging':
+      return isStaffRole(role) || isManagerRole(role);
+    case 'pin-login':
+      return canUsePinLogin(role);
+    case 'admin':
+      return isAdminRole(role);
+    case 'analytics':
+      return isManagerRole(role);
+    case 'settings':
+      return isAdminRole(role);
+    case 'users':
+      return isManagerRole(role);
+    case 'roles':
+      return isAdminRole(role);
+    default:
+      return false;
+  }
+}
+
 // =============================================================================
 // Verification Helpers
 // =============================================================================
@@ -292,43 +359,8 @@ export function canAccessOrganization(
 }
 
 // =============================================================================
-// Feature Access
+// Feature Access (moved to above for consolidation)
 // =============================================================================
-
-/**
- * Check if user can access a specific feature
- *
- * @param role - User's role
- * @param feature - Feature to check
- * @returns True if user can access feature
- */
-export function canAccessFeature(
-  role: RoleType,
-  feature:
-    | 'briefings'
-    | 'verification'
-    | 'analytics'
-    | 'settings'
-    | 'users'
-    | 'roles'
-): boolean {
-  switch (feature) {
-    case 'briefings':
-      return true; // All roles can see briefings
-    case 'verification':
-      return isManagerRole(role);
-    case 'analytics':
-      return isManagerRole(role);
-    case 'settings':
-      return isAdminRole(role);
-    case 'users':
-      return isManagerRole(role);
-    case 'roles':
-      return isAdminRole(role);
-    default:
-      return false;
-  }
-}
 
 /**
  * Get allowed routes for a role

@@ -1,0 +1,223 @@
+# User Management Flow
+# ====================
+# Admin manages team members
+#
+# This is a P0 flow that tests:
+# - Admin access to user management
+# - Viewing user list
+# - Add User button availability
+# - Search and filter capabilities
+#
+# NOTE: This flow focuses on navigation and viewing, not creating users.
+
+flow:
+  id: user-management
+  name: "User Management Flow"
+  description: "Admin manages team members"
+  narration: "This flow demonstrates how an admin accesses and views the user management page."
+  priority: p0
+  tags:
+    - single-role
+    - admin
+    - users
+    - management
+
+# ============================================================================
+# ROLES
+# ============================================================================
+
+roles:
+  - type: ADMIN
+    fixture: adminPage
+    user: adminUser
+
+# ============================================================================
+# STEPS
+# ============================================================================
+
+steps:
+  # --------------------------------------------------------------------------
+  # STEP 1: Admin opens admin dashboard
+  # --------------------------------------------------------------------------
+  - id: open-admin-dashboard
+    role: ADMIN
+    description: "Admin opens the admin dashboard"
+    narration: "Joel opens the admin console to manage team members."
+
+    actions:
+      - type: navigate
+        url: /admin
+
+      - type: waitFor
+        text: "Admin Console"
+        timeout: 15000
+
+    assertions:
+      - type: visible
+        selector: "text=Admin Console"
+
+      - type: visible
+        selector: "a[href='/admin/users']"
+        fallback:
+          - "text=Users"
+
+    businessLogic:
+      - function: isAdminRole
+        args:
+          role: ADMIN
+        expected: true
+
+      - function: canAccessAdmin
+        args:
+          role: ADMIN
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 2: Admin navigates to users page
+  # --------------------------------------------------------------------------
+  - id: navigate-to-users
+    role: ADMIN
+    description: "Admin clicks on Users in the sidebar"
+    narration: "Joel clicks on Users to manage team members."
+
+    actions:
+      - type: click
+        selector: "a[href='/admin/users']"
+        fallback:
+          - "text=Users"
+        waitAfter: 2000
+
+      - type: waitFor
+        text: "User Management"
+        timeout: 10000
+
+    assertions:
+      - type: visible
+        selector: "text=User Management"
+
+      - type: visible
+        selector: "text=Add User"
+
+    businessLogic:
+      - function: canAccessAdmin
+        args:
+          role: ADMIN
+        expected: true
+
+  # --------------------------------------------------------------------------
+  # STEP 3: Admin sees user list
+  # --------------------------------------------------------------------------
+  - id: view-user-list
+    role: ADMIN
+    description: "Admin sees the list of team members"
+    narration: "Joel sees the table of all team members with their roles and status."
+
+    actions:
+      - type: waitFor
+        text: "Joined"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "text=Joined"
+
+      - type: visible
+        selector: "text=Actions"
+
+    businessLogic:
+      - function: calculateProgress
+        args:
+          current: 5
+          target: 10
+        expected: 50
+
+  # --------------------------------------------------------------------------
+  # STEP 4: Admin sees search and filters
+  # --------------------------------------------------------------------------
+  - id: view-search-filters
+    role: ADMIN
+    description: "Admin sees search and filter options"
+    narration: "Joel can search for users and filter by role or status."
+
+    actions:
+      - type: waitFor
+        text: "Search"
+        timeout: 5000
+
+    assertions:
+      - type: visible
+        selector: "input[placeholder*='Search']"
+        fallback:
+          - "[data-testid='search-input']"
+
+      - type: visible
+        selector: "text=All Roles"
+        fallback:
+          - "select"
+
+    businessLogic:
+      - function: canAccessAdmin
+        args:
+          role: SERVER
+        expected: false
+
+      - function: canAccessAdmin
+        args:
+          role: MANAGER
+        expected: false
+
+  # --------------------------------------------------------------------------
+  # STEP 5: Admin verifies add user capability
+  # --------------------------------------------------------------------------
+  - id: verify-add-capability
+    role: ADMIN
+    description: "Admin verifies they can add new users"
+    narration: "Joel confirms the Add User button is available for creating new team members."
+
+    actions:
+      - type: waitFor
+        text: "Add User"
+        timeout: 3000
+
+    assertions:
+      - type: visible
+        selector: "button:has-text('Add User')"
+        fallback:
+          - "text=Add User"
+
+    businessLogic:
+      - function: isAdminRole
+        args:
+          role: ADMIN
+        expected: true
+
+      - function: isManagerRole
+        args:
+          role: ADMIN
+        expected: false
+
+# ============================================================================
+# METADATA
+# ============================================================================
+
+metadata:
+  timeout: 60000
+  retries: 1
+
+  video:
+    enabled: true
+    size:
+      width: 1280
+      height: 720
+
+  reporter:
+    includeTimestamps: true
+    stepLabels: true
+
+  seedRequirements:
+    - type: user
+      role: ADMIN
+      email: joel@achotel.com
+
+  documentation:
+    flow: docs/03-USER-FLOWS.md#user-management
